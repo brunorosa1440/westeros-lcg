@@ -1,8 +1,6 @@
 // ================= INTERFACE (PT / EN) =================
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const TYPE_PT = i18nObj({ character: 'Personagem', location: 'Local', attachment: 'Anexo', event: 'Evento', plot: 'Plot', agenda: 'Agenda' },
-  { character: 'Character', location: 'Location', attachment: 'Attachment', event: 'Event', plot: 'Plot', agenda: 'Agenda' });
 const KW_PT = i18nObj({ renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'Sem anexos', terminal: 'Terminal' },
   { renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'No attachments', terminal: 'Terminal' });
 const store = {
@@ -12,7 +10,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v0.8';
+const APP_VERSION = 'v0.9';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {

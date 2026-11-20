@@ -217,6 +217,8 @@ function LX(pt, en) { return LANG === 'en' ? en : pt; }
 function i18nObj(pt, en) { const src = () => LANG === 'en' ? en : pt; return new Proxy({}, { get: (_, k) => src()[k], ownKeys: () => Reflect.ownKeys(pt), getOwnPropertyDescriptor: (_, k) => ({ enumerable: true, configurable: true, value: src()[k] }), has: (_, k) => k in pt }); }
 const FACTION_NAMES = i18nObj({ baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutra' },
   { baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutral' });
+const TYPE_PT = i18nObj({ character: 'Personagem', location: 'Local', attachment: 'Anexo', event: 'Evento', plot: 'Plot', agenda: 'Agenda' },
+  { character: 'Character', location: 'Location', attachment: 'Attachment', event: 'Event', plot: 'Plot', agenda: 'Agenda' });
 const CH_SYM = { military: '⚔', intrigue: '👁', power: '♛' };
 const CH_NAMES = i18nObj({ military: '⚔ Militar', intrigue: '👁 Intriga', power: '♛ Poder' }, { military: '⚔ Military', intrigue: '👁 Intrigue', power: '♛ Power' });
 const ICON_OF = { military: 'M', intrigue: 'I', power: 'P' };
@@ -303,6 +305,7 @@ class Game {
   }
   hasIcon(c, type) {
     const L = ICON_OF[type];
+    if ((c.phLost || '').includes(L)) return false;
     if ((c.d.i || '').includes(L) || c.tmpIcons.includes(L) || (c.phIcons || '').includes(L)) return true;
     if (!this.blank(c) && ab(c).icons && ab(c).icons(this, c).includes(L)) return true;
     for (const a of c.att) if (ab(a).attIcons && ab(a).attIcons(this, a, c).includes(L)) return true;
@@ -328,7 +331,7 @@ class Game {
     return Math.max(0, base + this.mod(p, 'income'));
   }
   initiative(p) { return (p.plot ? p.plot.d.p[1] : 0) + this.mod(p, 'initiative'); }
-  reserve(p) { return (p.plot ? p.plot.d.p[3] : 7) + this.mod(p, 'reserve'); }
+  reserve(p) { let r = (p.plot ? p.plot.d.p[3] : 7) + this.mod(p, 'reserve'); if (this.first === p.opp && p.opp.chars.some(c => c.code === '01066' && !this.blank(c))) r -= 1; return Math.max(0, r); }
   totalPower(p) { let t = p.power; for (const c of [...p.chars, ...p.locs]) t += c.power; return t; }
   canTrigger(p) { // Catelyn Stark
     const ch = this.ch; if (!ch) return true;
@@ -358,17 +361,23 @@ class Game {
     const p = c.owner; c.zone = z;
     if (z === 'hand') p.hand.push(c); else if (z === 'deckbottom') { c.zone = 'deck'; p.deck.push(c); } else if (z === 'deck') p.deck.unshift(c); else if (z === 'discard') { p.discard.push(c); if (c.d.t === 'character') (this.recentDisc = this.recentDisc || []).push(c); } else if (z === 'dead') p.dead.push(c); else if (z === 'removed') p.removed.push(c);
   }
-  resetCard(c) { c.recruited = []; c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.phIcons = ''; c.tmpKw = {}; c.tokens = 0; }
+  resetCard(c) { c.phLost = ''; c.recruited = []; c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.phIcons = ''; c.tmpKw = {}; c.tokens = 0; }
   // carta sai de jogo: anexos e duplicados vão para o descarte do dono
   leavePlay(c, dest) {
     // regra: anexos voltam à mão do dono (Terminal → descarte); duplicados vão para o descarte
-    for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); const term = a.d.k?.terminal; this.toZone(a, term ? 'discard' : 'hand'); this.log(term ? LX(`${this.cn(a)} (Terminal) vai para o descarte.`, `${this.cn(a)} (Terminal) is discarded.`) : LX(`${this.cn(a)} volta para a mão de ${a.owner.name}.`, `${this.cn(a)} returns to ${a.owner.name}'s hand.`), 'dim'); }
+    for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); const term = a.d.k?.terminal || ab(a).terminalWhenAttached; this.toZone(a, term ? 'discard' : 'hand'); this.log(term ? LX(`${this.cn(a)} (Terminal) vai para o descarte.`, `${this.cn(a)} (Terminal) is discarded.`) : LX(`${this.cn(a)} volta para a mão de ${a.owner.name}.`, `${this.cn(a)} returns to ${a.owner.name}'s hand.`), 'dim'); }
     for (const d of [...c.dupes]) { this.removeFromZone(d); this.resetCard(d); this.toZone(d, 'discard'); }
     this.removeFromZone(c); if (c.trueOwner) { c.owner = c.trueOwner; delete c.trueOwner; } this.resetCard(c); this.toZone(c, dest);
   }
   async trySave(c) {
     if (c.dupes.length) { const d = c.dupes[0]; this.removeFromZone(d); this.toZone(d, 'discard'); this.log(LX(`${this.cn(c)} é salvo ao descartar um duplicado.`, `${this.cn(c)} is saved by discarding a duplicate.`)); return true; }
     for (const o of this.inPlay(c.owner)) if (!this.blank(o) && ab(o).saveOther && this.canTrigger(o.owner)) { if (await ab(o).saveOther(this, o, c)) return true; }
+    const rs = c.d.f === 'greyjoy' ? c.owner.hand.find(x => x.code === '01081') : null;
+    if (rs && this.canTrigger(c.owner) && !this.myPlot(c.owner, '01016')) {
+      const v = await c.owner.ctrl.chooseOption(this, c.owner, { prompt: LX(`Jogar Risen from the Sea para salvar ${this.cn(c)}?`, `Play Risen from the Sea to save ${this.cn(c)}?`), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value === (AI.value(this, c) >= 4) ? 1 : 0, card: rs });
+      if (v) { this.removeFromZone(rs); this.log(LX(`${c.owner.name} joga Risen from the Sea: ${this.cn(c)} é salvo.`, `${c.owner.name} plays Risen from the Sea: ${this.cn(c)} is saved.`), 'ev');
+        if (await this.offerCancel(c.owner.opp, rs, 0)) { this.toZone(rs, 'discard'); } else { rs.zone = 'att'; rs.parent = c; this.resetCard(rs); c.att.push(rs); return true; } }
+    }
     const bg = c.att.find(a => a.code === '01033');
     if (bg && this.canTrigger(bg.owner)) { this.removeFromZone(bg); this.resetCard(bg); this.toZone(bg, 'discard'); this.log(LX(`${bg.owner.name} sacrifica Bodyguard para salvar ${this.cn(c)}.`, `${bg.owner.name} sacrifices Bodyguard to save ${this.cn(c)}.`)); return true; }
     return false;
@@ -426,6 +435,7 @@ class Game {
   gainPower(p, n, card) {
     if (n <= 0) return;
     if (card && this.anyPlot('09048') && !card.d.tr.includes('King') && !card.d.tr.includes('Queen')) { this.log(LX(`${this.cn(card)} não pode ganhar poder (Your King Commands It).`, `${this.cn(card)} cannot gain power (Your King Commands It).`), 'dim'); return; }
+    if (card) for (const a of card.att) if (ab(a).afterParentGainPower) ab(a).afterParentGainPower(this, a, card);
     if (card) { card.power += n; this.log(LX(`${this.cn(card)} ganha ${n} de poder.`, `${this.cn(card)} gains ${n} power.`), 'pow'); }
     else { p.power += n; this.log(LX(`${p.name} ganha ${n} de poder para a facção.`, `${p.name} gains ${n} power for their faction.`), 'pow'); }
     this.checkWin();
@@ -475,6 +485,7 @@ class Game {
     let red = 0;
     for (const r of p.reducers) if (r.modes.includes(mode) && r.f(c)) red += typeof r.amt === 'function' ? r.amt(c) : r.amt;
     if (mode === 'marshal' && this.myPlot(p, '01004') && !p.flags.nobleUsed && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) red += 2;
+    if (mode === 'play' && c.d.t === 'event' && !p.flags.paxter && p.chars.some(x => x.code === '01182' && !this.blank(x))) red += 1;
     if (mode === 'marshal' && this.myPlot(p, '10047')) { const k = 'pp_' + c.d.t; if (!p.flags[k]) red += { character: 3, location: 2, attachment: 1 }[c.d.t] || 0; }
     return red;
   }
@@ -487,6 +498,7 @@ class Game {
     p.reducers = p.reducers.filter(r => !(r.modes.includes(mode) && r.f(c)));
     if (mode === 'marshal' && this.myPlot(p, '01004') && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) p.flags.nobleUsed = true;
     if (mode === 'marshal' && this.myPlot(p, '10047')) p.flags['pp_' + c.d.t] = true;
+    if (mode === 'play' && c.d.t === 'event' && p.chars.some(x => x.code === '01182' && !this.blank(x))) p.flags.paxter = true;
   }
   canMarshal(p, c) {
     if (c.zone !== 'hand' || !['character', 'location', 'attachment'].includes(c.d.t)) return false;
@@ -497,6 +509,7 @@ class Game {
     if (!dup && c.d.t === 'attachment' && !this.attachTargets(p, c).length) return false;
     return this.costOf(p, c, 'marshal') <= p.gold;
   }
+  async afterMarshalOrPlay(p, c) { await this.fire('afterMarshalOrPlay', p, c); }
   async marshal(p, c) {
     const cost = this.costOf(p, c, 'marshal');
     this.consumeReducers(p, c, 'marshal');
@@ -504,6 +517,7 @@ class Game {
     if (c.d.k?.limited) p.limitedUsed++;
     if (cost) this.log(LX(`(${p.name} paga ${cost} ouro)`, `(${p.name} pays ${cost} gold)`), 'dim');
     await this.putIntoPlay(p, c, 'marshal');
+    await this.afterMarshalOrPlay(p, c);
   }
   ambushCost(p, c) {
     if (c.zone !== 'hand') return null;
@@ -543,7 +557,18 @@ class Game {
     this.log(LX(`${p.name} joga o evento ${this.cn(c)}.`, `${p.name} plays the event ${this.cn(c)}.`), 'ev');
     const cancelled = await this.offerCancel(p.opp, c, cost);
     if (!cancelled) await e.run(this, p, c, ctx);
+    await this.afterMarshalOrPlay(p, c);
     this.toZone(c, 'discard'); this.emit();
+  }
+  // Treachery: cancela uma ação de personagem/local/anexo do adversário (os custos de ajoelhar já não se aplicam: a carta fica ajoelhada se a ação a ajoelhava)
+  async offerTreachery(q, card) {
+    if (!this.canTrigger(q) || this.myPlot(q, '01016')) return false;
+    const tr = q.hand.find(x => x.code === '01102'); if (!tr || q.gold < 1 || !q.chars.some(c => c.d.u && c.d.f === 'lannister')) return false;
+    const v = await q.ctrl.chooseOption(this, q, { prompt: LX(`${card.owner.name} vai usar ${this.cn(card)}. Jogar Treachery para cancelar?`, `${card.owner.name} is about to use ${this.cn(card)}. Play Treachery to cancel it?`), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value === (AI.value(this, card) >= 5) ? 1 : 0, card });
+    if (!v) return false;
+    q.gold -= 1; this.removeFromZone(tr); this.toZone(tr, 'discard'); this.log(LX(`${q.name} joga Treachery: a habilidade de ${this.cn(card)} é cancelada.`, `${q.name} plays Treachery: ${this.cn(card)}'s ability is cancelled.`), 'ev');
+    if (!card.kneel && ['chars', 'locs', 'att'].includes(card.zone)) card.kneel = true; // custo de ajoelhar continua pago
+    return true;
   }
   async offerCancel(q, evCard, evCost) {
     if (!this.canTrigger(q)) return false;
@@ -592,7 +617,8 @@ class Game {
       const acts = this.availableActions(cur, ctx);
       let chosen = null;
       if (acts.length) chosen = await cur.ctrl.actionWindow(this, cur, { prompt: prompt || LX('Janela de ações', 'Action window'), actions: acts, passLabel: LX('Passar', 'Pass'), ctx });
-      if (chosen && chosen.run) { await chosen.run(); await this.flushPending(); await this.checkZero(); this.checkRecruiters(); passes = 0; this.emit(); }
+      if (chosen && chosen.run && chosen.card && ['chars', 'locs', 'att'].includes(chosen.card.zone) && await this.offerTreachery(cur.opp, chosen.card)) { passes = 0; this.emit(); }
+      else if (chosen && chosen.run) { await chosen.run(); await this.flushPending(); await this.checkZero(); this.checkRecruiters(); passes = 0; this.emit(); }
       else passes++;
       cur = cur.opp;
     }
@@ -640,6 +666,7 @@ class Game {
       await this.putIntoPlayUnderControl(q, c);
     }
   }
+  pump(c, n, dur) { if (dur === 'phase') c.ph += n; else c.tmp += n; if (n > 0 && !this.blank(c) && ab(c).afterPumped) ab(c).afterPumped(this, c); }
   canStand(c) { return !(c.flags.noStand === this.phase); }
   // ---------- reações genéricas ----------
   async fire(hook, ...args) {
@@ -712,7 +739,7 @@ class Game {
     const cbs = this.endOfPhase; this.endOfPhase = [];
     for (const f of cbs) await f();
     await this.fire('onPhaseEnd', this.phase);
-    for (const p of this.players) { p.reducers = []; for (const c of p.chars) { c.ph = 0; c.phIcons = ''; } }
+    for (const p of this.players) { p.reducers = []; for (const c of p.chars) { c.ph = 0; c.phIcons = ''; c.phLost = ''; } }
     this.emit();
   }
   async plotPhase() {
@@ -758,6 +785,7 @@ class Game {
     for (const p of this.order()) {
       const mm = this.mark();
       const inc = this.income(p); p.gold += inc; this.log(LX(`${p.name} recolhe ${inc} ouro (total ${p.gold}).`, `${p.name} collects ${inc} gold (total ${p.gold}).`), 'gold');
+      { const q = p.opp, mc = q.hand.find(x => x.code === '01138'); if (mc && !q.flags.meager && p.gold > 0 && this.canTrigger(q) && !this.myPlot(q, '01016')) { const v = await q.ctrl.chooseOption(this, q, { prompt: LX(`Jogar A Meager Contribution (tirar 1 ouro a ${p.name})?`, `Play A Meager Contribution (take 1 gold from ${p.name})?`), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value ? 1 : 0, card: mc }); if (v) { q.flags.meager = true; this.removeFromZone(mc); this.log(LX(`${q.name} joga A Meager Contribution.`, `${q.name} plays A Meager Contribution.`), 'ev'); if (!(await this.offerCancel(p, mc, 0))) { p.gold -= 1; q.gold += 1; this.log(LX(`1 ouro passa de ${p.name} para ${q.name}.`, `1 gold moves from ${p.name} to ${q.name}.`), 'gold'); } this.toZone(mc, 'discard'); } } }
       this.activeP = p;
       let guard = 0;
       while (guard++ < 60) {
@@ -783,6 +811,7 @@ class Game {
     if (t === 'intrigue' && p.locs.some(l => l.code === '01097' && !this.blank(l))) n++;
     if (t === 'military') n += p.chars.filter(c => c.code === '01162' && !this.blank(c)).length;
     if (t === 'power' && this.myPlot(p, '08040')) n++;
+    if (p.flags.extraCh && p.flags.extraCh[t] === this.phase) n++;
     return n;
   }
   canAttackWith(p, c, t) { return c.zone === 'chars' && !c.kneel && this.hasIcon(c, t) && c.flags.noAttack !== this.phase; }
@@ -791,6 +820,8 @@ class Game {
     const total = CH_TYPES.reduce((s, x) => s + (p.chDone[x] || 0), 0);
     if (this.myPlot(p, '01021') && total >= 1) return false;
     if (this.myPlot(p, '08040') && t !== 'power') return false;
+    if (p.flags.banned && p.flags.banned[t] === this.phase) return false;
+    if (p.flags.noChallengeRound) return false;
     if (this.anyPlot('01003') && t !== 'intrigue' && !p.won.intrigue) return false;
     return p.chars.some(c => this.canAttackWith(p, c, t));
   }
@@ -807,7 +838,7 @@ class Game {
         const buttons = CH_TYPES.filter(t => this.challengeAllowed(p, t)).map(t => ({ label: LX(`Desafio ${CH_NAMES[t]}`, `${CH_NAMES[t]} challenge`), value: t, ai: AI.challengeScore(this, p, t) }));
         const ch = await p.ctrl.actionWindow(this, p, { prompt: LX('Challenges: inicia um desafio, usa uma ação ou passa.', 'Challenges: initiate a challenge, use an action, or pass.'), actions: acts, buttons, passLabel: LX('Terminar desafios', 'Done with challenges'), ctx });
         if (!ch) break;
-        if (ch.run) { await ch.run(); this.emit(); continue; }
+        if (ch.run) { if (ch.card && ['chars', 'locs', 'att'].includes(ch.card.zone) && await this.offerTreachery(p.opp, ch.card)) { this.emit(); continue; } await ch.run(); await this.flushPending(); this.emit(); continue; }
         if (ch.button) { await this.doChallenge(p, ch.button); this.checkWin(); }
       }
     }
@@ -829,6 +860,7 @@ class Game {
     this.emit();
     await this.fire('afterChallengeInitiated', ch);
     await this.fire('afterAttackersDeclared', ch);
+    for (const j of att.chars) if (ab(j).autoParticipate && !this.blank(j) && !j.kneel && !ch.attackers.includes(j) && ab(j).autoParticipate(this, j, ch)) { ch.attackers.push(j); this.log(LX(`${this.cn(j)} também participa no desafio.`, `${this.cn(j)} also participates in the challenge.`)); }
     // stealth
     for (const c of ch.attackers) if (this.hasKw(c, 'stealth')) {
       const benjen = def.chars.some(x => x.code === '01122' && !this.blank(x));
@@ -836,15 +868,19 @@ class Game {
       if (!t.length) continue;
       const [s] = await att.ctrl.chooseCards(this, att, { prompt: LX(`Stealth de ${this.cn(c)}: escolhe uma personagem que não pode defender`, `${this.cn(c)}'s stealth: choose a character that cannot defend`), cands: t, min: 0, max: 1, ai: x => AI.stealthScore(this, att, x, type) });
       if (s) { ch.stealthed.push(s); this.log(LX(`${this.cn(c)} usa stealth em ${this.cn(s)}.`, `${this.cn(c)} uses stealth on ${this.cn(s)}.`)); }
+      if (s && ab(c).afterStealth && !this.blank(c)) ab(c).afterStealth(this, c, s);
     }
     // janela de ações depois de iniciar o desafio (regras: antes dos defensores)
     await this.actionRound({ phase: 'challenges', ch, active: att, preDefense: true }, this.first, LX(`Desafio ${CH_NAMES[type]} iniciado (ataque ${this.sumStr(ch.attackers)}). Ações antes dos defensores?`, `${CH_NAMES[type]} challenge initiated (attack ${this.sumStr(ch.attackers)}). Actions before defenders?`));
     // defensores
-    const dc = def.chars.filter(c => !c.kneel && this.hasIcon(c, type) && !ch.stealthed.includes(c));
+    const dc = def.chars.filter(c => (!c.kneel || (ab(c).defendKneeling && !this.blank(c) && ab(c).defendKneeling(this, c, ch))) && this.hasIcon(c, type) && !ch.stealthed.includes(c) && c.flags.noDefend !== this.phase);
+    const kof = ch.attackers.length === 1 && ch.attackers[0].code === '01185' && !this.blank(ch.attackers[0]);
     if (dc.length) {
-      const defenders = await def.ctrl.chooseCards(this, def, { prompt: LX(`${att.name} ataca (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Escolhe os defensores (ou nenhum).`, `${att.name} attacks (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Choose defenders (or none).`), cands: dc, min: 0, max: jousting ? 1 : dc.length, aiPick: () => AI.pickDefenders(this, def, ch, dc, jousting), doneLabel: LX('Confirmar defesa', 'Confirm defense') });
+      const defenders = await def.ctrl.chooseCards(this, def, { prompt: LX(`${att.name} ataca (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Escolhe os defensores (ou nenhum).`, `${att.name} attacks (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Choose defenders (or none).`), cands: dc, min: 0, max: jousting || kof ? 1 : dc.length, aiPick: () => AI.pickDefenders(this, def, ch, dc, jousting), doneLabel: LX('Confirmar defesa', 'Confirm defense') });
       ch.defenders = [...defenders];
-      for (const c of defenders) c.kneel = true;
+      for (const m of ch.mustDefend || []) if (dc.includes(m) && !defenders.includes(m) && !(jousting || kof) ) { defenders.push(m); this.log(LX(`${this.cn(m)} é obrigado a defender.`, `${this.cn(m)} must defend.`)); }
+      ch.defenders = [...defenders];
+      for (const c of defenders) if (!(ab(c).noKneelDefend && !this.blank(c) && ab(c).noKneelDefend(this, c, ch))) c.kneel = true;
       if (defenders.length) this.log(LX(`${def.name} defende com ${defenders.map(c => this.cn(c)).join(', ')}.`, `${def.name} defends with ${defenders.map(c => this.cn(c)).join(', ')}.`), 'ch'); else this.log(LX(`${def.name} não defende.`, `${def.name} does not defend.`), 'ch');
     } else this.log(LX(`${def.name} não tem defensores disponíveis.`, `${def.name} has no available defenders.`), 'ch');
     this.emit();
@@ -858,7 +894,7 @@ class Game {
     ch.diff = Math.abs(A - D);
     if (!ch.winner) { this.log(LX(`Desafio ${CH_NAMES[type]}: sem vencedor (${A} × ${D}).`, `${CH_NAMES[type]} challenge: no winner (${A} × ${D}).`), 'ch'); this.cleanupChallenge(); await this.informChallenge(ch, mc, A, D); return; }
     this.log(LX(`Desafio ${CH_NAMES[type]}: ${ch.winner.name} vence (${A} × ${D}).`, `${CH_NAMES[type]} challenge: ${ch.winner.name} wins (${A} × ${D}).`), 'chw');
-    ch.winner.won[type] = (ch.winner.won[type] || 0) + 1; ch.loser.lost[type] = (ch.loser.lost[type] || 0) + 1;
+    ch.winner.won[type] = (ch.winner.won[type] || 0) + 1; ch.loser.lost[type] = (ch.loser.lost[type] || 0) + 1; if (ch.loser === def) def.flags.lostDef = this.phase;
     if (ch.winner === att) {
       if (D === 0) { ch.unopposed = true; this.log(LX('Desafio sem oposição (unopposed): +1 poder.', 'Unopposed challenge: +1 power.')); this.gainPower(att, 1); }
       await this.applyClaim(ch);
@@ -891,7 +927,8 @@ class Game {
   sideStr(ch, side) {
     const list = side === 'att' ? ch.attackers : ch.defenders, p = side === 'att' ? ch.att : ch.def;
     let s = 0;
-    for (const c of list) if (c.zone === 'chars') { if (ch.type === 'power' && c.att.some(a => a.code === '08009')) continue; s += this.str(c); }
+    const balon = side === 'def' ? ch.attackers.find(c => c.code === '01068' && c.zone === 'chars' && !this.blank(c)) : null;
+    for (const c of list) if (c.zone === 'chars') { if (ch.type === 'power' && c.att.some(a => a.code === '08009')) continue; if (c.flags.noContrib === ch) continue; if (balon && this.str(c) < this.str(balon)) continue; s += this.str(c); }
     if (list.some(c => c.zone === 'chars')) for (const o of this.inPlay(p)) if (!this.blank(o) && ab(o).sideStr) s += ab(o).sideStr(this, o, ch) || 0;
     return s;
   }
@@ -899,6 +936,7 @@ class Game {
   claimValue(ch) {
     let v = ch.att.plot ? ch.att.plot.d.p[2] : 1;
     v += ch.claimMod;
+    if (ch.att.flags.sunspear && ch.att.flags.sunspear[ch.type] === this.phase) v += 1;
     for (const c of ch.attackers) if (!this.blank(c) && ab(c).claimMod) v += ab(c).claimMod(this, c, ch);
     if (this.myPlot(ch.def, '01008') && ch.def.plot.flags.calmType === ch.type) v -= 1;
     return Math.max(0, v);
@@ -945,7 +983,7 @@ class Game {
           if (k) { k.kneel = true; intimDone = true; this.log(LX(`${this.cn(c)} intimida ${this.cn(k)} (ajoelhada).`, `${this.cn(c)} intimidates ${this.cn(k)} (knelt).`)); }
         }
       }
-      if (this.hasKw(c, 'pillage')) { this.log(`Pillage (${this.cn(c)}):`); this.discardTop(L); await this.flushPending(); }
+      if (this.hasKw(c, 'pillage')) { this.log(`Pillage (${this.cn(c)}):`); const pc = this.discardTop(L); if (pc && ab(c).afterPillage && !this.blank(c)) await ab(c).afterPillage(this, c, pc, ch); await this.flushPending(); }
       if (this.hasKw(c, 'renown')) this.gainPower(W, 1, c);
     }
   }
@@ -2191,11 +2229,197 @@ STARTER_DECKS.push(
   ]),
 );
 
+// ================= CORE SET: restantes facções (Baratheon, Greyjoy, Martell, Night's Watch, Targaryen, Tyrell, Lannister) =================
+const usedPlots = p => p.used.length;
+const pumpScoreP = (g, p, n) => g.ch ? AI.pumpScore(g, p, g.ch, n) : 0;
+async function chooseIcon(g, p, prompt, aiPref) { return p.ctrl.chooseOption(g, p, { prompt, options: CH_TYPES.map(t => ({ label: CH_NAMES[t], value: t })), ai: o => aiPref ? aiPref(o.value) : 1 }); }
+
+const CORE2 = {
+  // ---------- BARATHEON ----------
+  '01047': { pt: "Reação: depois de fazeres marshal ou jogares uma carta R'hllor, escolhe e ajoelha uma personagem (1 vez por ronda).", en: "Reaction: after you marshal or play a R'hllor card, choose and kneel a character (once per round).",
+    afterMarshalOrPlay: async (g, m, p, c) => { if (p !== m.owner || !c.d.tr.includes("R'hllor") || m.flags.mel) return; const t = g.allChars().filter(x => !x.kneel && g.kneelable(x)); if (!t.length) return;
+      const [k] = await p.ctrl.chooseCards(g, p, { prompt: LX('Melisandre: escolhe uma personagem para ajoelhar (ou nenhuma)', 'Melisandre: choose a character to kneel (or none)'), cands: t, min: 0, max: 1, ai: x => x.owner === p ? -10 : g.str(x) + AI.value(g, x) }); if (!k) return; m.flags.mel = true; k.kneel = true; g.log(LX(`Melisandre: ${g.cn(k)} fica ajoelhada.`, `Melisandre: ${g.cn(k)} is knelt.`)); } },
+  '01055': { pt: 'Sem anexos. Enquanto o adversário controlar uma personagem King, ganha ícone de Intriga.', en: 'No attachments. While an opponent controls a King character, gains an Intrigue icon.',
+    icons: (g, c) => c.owner.opp.chars.some(x => x.d.tr.includes('King')) ? 'I' : '' },
+  '01058': { pt: 'Só personagem Baratheon. Se estiver no Stannis Baratheon, ele ganha renown. Reação: depois de a personagem ganhar poder, levanta-a (1 vez por fase).', en: 'Baratheon character only. On Stannis Baratheon, he gains renown. Reaction: after the attached character gains power, stand it (once per phase).',
+    attachOk: (g, a, t) => t.d.f === 'baratheon', attKw: (g, a, t) => t.d.n === 'Stannis Baratheon' ? { renown: 1 } : {},
+    afterParentGainPower: (g, a, t) => { if (t.kneel && a.flags.lb !== g.phase && g.canStand(t)) { a.flags.lb = g.phase; t.kneel = false; g.log(LX(`Lightbringer: ${g.cn(t)} levanta-se.`, `Lightbringer: ${g.cn(t)} stands.`)); } } },
+  '01062': { pt: 'Ação de marshaling: ajoelha personagens do mesmo jogador com STR total até 4; depois uma delas ganha 1 poder.', en: 'Marshaling action: kneel characters controlled by the same player with up to 4 total STR; then one of them gains 1 power.',
+    ev: { timing: 'action', cond: (g, p, ctx) => g.phase === 'marshal' && !ctx.reaction, ai: (g, p) => p.opp.chars.filter(c => !c.kneel && g.str(c) <= 4 && g.kneelable(c)).length >= 1 && g.activeP === p ? 4 : 0,
+      run: async (g, p) => { const q = await p.ctrl.chooseOption(g, p, { prompt: LX('Consolidation of Power: personagens de que jogador?', 'Consolidation of Power: whose characters?'), options: [{ label: p.opp.name, value: p.opp }, { label: LX('Minhas', 'Mine'), value: p }], ai: o => o.value === p.opp ? 1 : 0 });
+        let left = 4; const chosen = [];
+        while (true) { const t = q.chars.filter(c => !c.kneel && g.kneelable(c) && !chosen.includes(c) && g.str(c) <= left); if (!t.length) break; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX(`Escolhe personagens para ajoelhar (STR restante ${left})`, `Choose characters to kneel (STR left ${left})`), cands: t, min: 0, max: 1, ai: x => x.owner === p ? -5 : g.str(x) + 1, doneLabel: LX('Concluir', 'Done') }); if (!c) break; chosen.push(c); left -= g.str(c); }
+        for (const c of chosen) c.kneel = true; if (chosen.length) g.log(LX(`Consolidation of Power ajoelha ${chosen.map(c => g.cn(c)).join(', ')}.`, `Consolidation of Power kneels ${chosen.map(c => g.cn(c)).join(', ')}.`));
+        if (chosen.length) { const [w] = await p.ctrl.chooseCards(g, p, { prompt: LX('Qual delas ganha 1 poder?', 'Which one gains 1 power?'), cands: chosen, min: 1, max: 1, ai: x => x.owner === p ? 5 : -AI.value(g, x) }); g.gainPower(w.owner, 1, w); } } } },
+  '01063': { pt: 'Só num desafio em que defendes. Ação: uma personagem Baratheon tua ajoelhada passa a defender. Se ganhares, levanta-a.', en: 'Only during a challenge where you defend. Action: a kneeling Baratheon character you control becomes a defender. If you win, stand it.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !!g.ch && g.ch.def === p && !ctx.preDefense && !ctx.reaction && p.chars.some(c => c.kneel && c.d.f === 'baratheon' && !participating(g, c)), ai: (g, p) => { const ch = g.ch; const best = Math.max(0, ...p.chars.filter(c => c.kneel && c.d.f === 'baratheon' && !participating(g, c)).map(c => g.str(c))); return AI.pumpScore(g, p, ch, best); },
+      run: async (g, p) => { const ch = g.ch; const t = p.chars.filter(c => c.kneel && c.d.f === 'baratheon' && !participating(g, c)); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Ours is the Fury: escolhe a personagem', 'Ours is the Fury: choose the character'), cands: t, min: 1, max: 1, ai: x => g.str(x) }); ch.defenders.push(c); g.log(LX(`${g.cn(c)} passa a defender.`, `${g.cn(c)} is now defending.`)); ch.afterWinCbs.push(async () => { if (ch.winner === p && c.zone === 'chars') { c.kneel = false; g.log(LX(`${g.cn(c)} levanta-se.`, `${g.cn(c)} stands.`)); } }); } } },
+  '01064': { pt: "Só se controlares uma personagem R'hllor. Ação de desafios: vê a mão do adversário e descarta 1 carta.", en: "Only if you control a R'hllor character. Challenges action: look at an opponent's hand and discard 1 card from it.",
+    ev: { timing: 'action', cond: (g, p, ctx) => g.phase === 'challenges' && !ctx.reaction && p.opp.hand.length > 0 && p.chars.some(c => c.d.tr.includes("R'hllor")), ai: (g, p, ctx) => ctx.beforeChallenge && g.activeP === p ? 7 : 0,
+      run: async (g, p) => { const q = p.opp; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX(`Seen In Flames: mão de ${q.name} — escolhe 1 carta`, `Seen In Flames: ${q.name}'s hand — choose 1 card`), cands: [...q.hand], min: 1, max: 1, ai: y => AI.handValue(g, q, y), modal: true }); g.discardFromHand(q, x); g.log(LX(`${q.name} descarta ${g.cn(x)}.`, `${q.name} discards ${g.cn(x)}.`)); await g.flushPending(); } } },
+
+  // ---------- GREYJOY ----------
+  '01065': { pt: 'Reação: depois de ganhares dominance, põe em jogo uma personagem Ironborn da tua dead pile.', en: 'Reaction: after you win dominance, put an Ironborn character into play from your dead pile.',
+    afterWinDominance: async (g, c, w) => { const p = c.owner; if (w !== p) return; const t = p.dead.filter(x => x.d.tr.includes('Ironborn')); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Aeron Damphair: escolhe uma Ironborn da dead pile', 'Aeron Damphair: choose an Ironborn from your dead pile'), cands: t, min: 0, max: 1, ai: y => AI.value(g, y), modal: true }); if (x) { g.removeFromZone(x); x.zone = 'hand'; p.hand.push(x); await g.putIntoPlay(p, x, 'put'); } } },
+  '01066': { pt: 'Enquanto fores o primeiro jogador, o reserve do plot do adversário desce 1.', en: "While you are the first player, reduce the reserve value on each opponent's revealed plot by 1." },
+  '01067': { pt: 'Stealth. Reação: depois de ganhares um desafio sem oposição em que ela participa, levanta-a.', en: 'Stealth. Reaction: after you win an unopposed challenge she took part in, stand her.',
+    afterWin: (g, c, ch) => { if (ch.winner === c.owner && ch.unopposed && participating(g, c) && c.kneel) { c.kneel = false; g.log(LX('Asha Greyjoy levanta-se.', 'Asha Greyjoy stands.')); } } },
+  '01068': { pt: 'Renown. Enquanto ataca, cada defensor com STR menor do que a dele não conta para o desafio.', en: 'Renown. While attacking, each defending character with lower STR than his does not contribute its STR.' },
+  '01069': { pt: 'Pillage. Renown. Reação: depois de descartar uma carta com pillage, põe em jogo sob o teu controlo um local do descarte do adversário.', en: "Pillage. Renown. Reaction: after he discards a card using pillage, put a location from the losing opponent's discard pile into play under your control.",
+    afterPillage: async (g, c, pc, ch) => { const p = c.owner; const t = ch.loser.discard.filter(x => x.d.t === 'location' && !g.uniqueBlockedByDead(p, x)); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX("Euron: escolhe um local do descarte do adversário", "Euron: choose a location from the opponent's discard"), cands: t, min: 0, max: 1, ai: y => (y.d.cost || 0) + (y.d.m?.income ? 5 : 0), modal: true }); if (x) await g.putIntoPlayUnderControl(p, x); } },
+  '01071': { pt: 'Stealth. Reação: depois de ganhares um desafio sem oposição em que ele participa, ganha 1 poder.', en: 'Stealth. Reaction: after you win an unopposed challenge he took part in, he gains 1 power.',
+    afterWin: (g, c, ch) => { if (ch.winner === c.owner && ch.unopposed && participating(g, c)) g.gainPower(c.owner, 1, c); } },
+  '01073': { pt: 'Sem anexos. +1 STR por cada local Warship que controlas.', en: 'No attachments. +1 STR for each Warship location you control.', str: (g, c) => c.owner.locs.filter(l => l.d.tr.includes('Warship')).length },
+  '01074': { pt: 'Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima personagem Greyjoy.', en: 'Marshaling action: kneel so your next Greyjoy character costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.t === 'character' && x.d.f === 'greyjoy', LX('personagem Greyjoy', 'Greyjoy character')) },
+  '01075': { pt: 'Ação de marshaling: ajoelha para ajoelhar um local com custo impresso ≤ 2 (≤ 3 se fores o primeiro jogador).', en: 'Marshaling action: kneel to kneel a location with printed cost 2 or lower (3 or lower if you are first player).',
+    actions: (g, c) => { const p = c.owner; if (c.kneel || g.phase !== 'marshal') return []; const lim = g.first === p ? 3 : 2; const t = p.opp.locs.filter(l => !l.kneel && (l.d.cost || 0) <= lim); if (!t.length) return [];
+      return [{ label: LX('Lordsport Shipwright: ajoelhar um local', 'Lordsport Shipwright: kneel a location'), ai: t.some(l => ab(l).actions || ab(l).domStr) ? 6 : 1, run: async () => { c.kneel = true; const [l] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe o local', 'Choose the location'), cands: t, min: 1, max: 1, ai: y => (y.d.cost || 0) }); l.kneel = true; g.log(LX(`${g.cn(l)} fica ajoelhado.`, `${g.cn(l)} is knelt.`)); } }]; } },
+  '01077': { pt: 'Só Ironborn. Reação: depois de ganhares um desafio em que a personagem ataca, sacrifica o Throwing Axe para matar um defensor.', en: 'Ironborn character only. Reaction: after you win a challenge in which the attached character is attacking, sacrifice Throwing Axe to kill a defending character.',
+    attachOk: (g, a, t) => t.d.tr.includes('Ironborn'),
+    afterWin: async (g, a, ch) => { const p = a.owner; if (ch.winner !== p || !a.parent || !ch.attackers.includes(a.parent)) return; const t = ch.defenders.filter(x => x.zone === 'chars'); if (!t.length) return;
+      const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Throwing Axe: sacrificar para matar um defensor? (ou nenhum)', 'Throwing Axe: sacrifice to kill a defender? (or none)'), cands: t, min: 0, max: 1, ai: y => AI.value(g, y) - 3 }); if (!x) return; await g.sacrifice(a); await g.kill(x); } },
+  '01078': { pt: 'Enquanto controlares o Balon Greyjoy, ele ganha stealth. Reação: depois de ganhares um desafio sem oposição, compra 1 carta ou ganha 1 poder (2 vezes por ronda).', en: 'While you control Balon Greyjoy, he gains stealth. Reaction: after you win an unopposed challenge, draw 1 card or gain 1 power (twice per round).',
+    grantKw: (g, o, c) => c.code === '01068' ? { stealth: 1 } : null,
+    afterWin: async (g, l, ch) => { const p = l.owner; if (ch.winner !== p || !ch.unopposed || (l.flags.gk || 0) >= 2) return; l.flags.gk = (l.flags.gk || 0) + 1; const v = await p.ctrl.chooseOption(g, p, { prompt: LX('Great Kraken: comprar 1 carta ou ganhar 1 poder?', 'Great Kraken: draw 1 card or gain 1 power?'), options: [{ label: LX('Ganhar 1 poder', 'Gain 1 power'), value: 'p' }, { label: LX('Comprar 1', 'Draw 1'), value: 'd' }], ai: o => o.value === 'p' ? 1 : 0 }); if (v === 'p') g.gainPower(p, 1); else { g.log('Great Kraken:'); g.draw(p, 1); } } },
+  '01079': { pt: 'Ação de desafios: ajoelha para uma personagem Greyjoy participante ganhar +1 STR (+2 se fores o primeiro jogador) até ao fim do desafio.', en: 'Challenges action: kneel to give a participating Greyjoy character +1 STR (+2 if you are first player) until the end of the challenge.',
+    actions: (g, l, ctx) => { const p = l.owner; if (l.kneel || !g.ch || ctx.reaction) return []; const t = p.chars.filter(c => c.d.f === 'greyjoy' && participating(g, c)); if (!t.length) return []; const n = g.first === p ? 2 : 1;
+      return [{ label: LX(`Iron Fleet Scout: +${n} STR`, `Iron Fleet Scout: +${n} STR`), ai: pumpScoreP(g, p, n), run: async () => { const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe a personagem', 'Choose the character'), cands: t, min: 1, max: 1, ai: () => 1 }); l.kneel = true; g.pump(c, n); g.log(LX(`${g.cn(c)} ganha +${n} STR.`, `${g.cn(c)} gets +${n} STR.`)); } }]; } },
+  '01080': { pt: 'Limited. Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima carta Greyjoy.', en: 'Limited. Marshaling action: kneel so your next Greyjoy card costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.f === 'greyjoy', LX('carta Greyjoy', 'Greyjoy card')) },
+  '01081': { pt: 'Interrupção: quando uma personagem Greyjoy seria morta, salva-a; o Risen from the Sea fica anexado como Condition Terminal com +1 STR.', en: 'Interrupt: when a Greyjoy character would be killed, save it; Risen from the Sea attaches to it as a Terminal Condition giving +1 STR.',
+    attStr: () => 1, terminalWhenAttached: true },
+  '01082': { pt: 'Só se fores o primeiro jogador. Ação de desafios: um defensor com STR ≤ 5 não conta para este desafio.', en: 'Only if you are the first player. Challenges action: a defending character with STR 5 or lower does not contribute its STR to this challenge.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !!g.ch && g.first === p && !ctx.reaction && g.ch.defenders.some(c => g.str(c) <= 5 && c.flags.noContrib !== g.ch), ai: (g, p) => { const ch = g.ch; if (ch.att !== p) return 0; const best = Math.max(0, ...ch.defenders.filter(c => g.str(c) <= 5).map(c => g.str(c))); return AI.pumpScore(g, p, ch, best); },
+      run: async (g, p) => { const ch = g.ch; const t = ch.defenders.filter(c => g.str(c) <= 5); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX("The Kraken's Grasp: escolhe o defensor", "The Kraken's Grasp: choose the defender"), cands: t, min: 1, max: 1, ai: y => g.str(y) }); c.flags.noContrib = ch; g.log(LX(`${g.cn(c)} não conta para o desafio.`, `${g.cn(c)} does not contribute to the challenge.`)); } } },
+  '01083': { pt: 'Reação: depois de ganhares um desafio sem oposição, descarta um anexo ou local do adversário.', en: "Reaction: after you win an unopposed challenge, discard an attachment or location controlled by the losing opponent.",
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.unopposed && (ch.loser.locs.length || g.attsOf(ch.loser).length), ai: () => 15,
+      run: async (g, p, e, ch) => { const t = [...ch.loser.locs, ...g.attsOf(ch.loser)]; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('We Do Not Sow: escolhe o anexo ou local', 'We Do Not Sow: choose the attachment or location'), cands: t, min: 1, max: 1, ai: y => (y.d.cost || 0) + (y.d.m?.income ? 4 : 0) }); await g.discardFromPlay(x); } } },
+
+  // ---------- LANNISTER ----------
+  '01102': { pt: 'Só se controlares uma personagem Lannister única. Interrupção: cancela uma habilidade de personagem, local ou anexo do adversário (automatizado para Ações).', en: "Only if you control a unique Lannister character. Interrupt: cancel an opponent's character, location or attachment ability (automated for Actions)." },
+
+  // ---------- MARTELL ----------
+  '01103': { pt: 'Ambush (5). Reação: depois de entrar em jogo durante um desafio, retira uma personagem participante do desafio.', en: 'Ambush (5). Reaction: after Areo Hotah enters play during a challenge, remove a participating character from the challenge.',
+    onEnter: async (g, c) => { const p = c.owner, ch = g.ch; if (!ch) return; const t = [...ch.attackers, ...ch.defenders].filter(x => x.owner !== p); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Areo Hotah: retira uma personagem do desafio', 'Areo Hotah: remove a character from the challenge'), cands: t, min: 0, max: 1, ai: y => g.str(y) }); if (!x) return; ch.attackers = ch.attackers.filter(y => y !== x); ch.defenders = ch.defenders.filter(y => y !== x); g.log(LX(`${g.cn(x)} sai do desafio.`, `${g.cn(x)} is removed from the challenge.`)); } },
+  '01104': { pt: 'Ação: põe em jogo da mão uma personagem com custo impresso ≤ 5; depois a Arianne volta para a mão (1 vez por fase).', en: 'Action: put a character with printed cost 5 or lower into play from your hand, then return Arianne to your hand (once per phase).',
+    actions: (g, c, ctx) => { const p = c.owner; if (c.flags.ari === g.phase || ctx.reaction) return []; const t = p.hand.filter(x => x.d.t === 'character' && (x.d.cost || 0) <= 5 && !g.uniqueBlockedByDead(p, x)); if (!t.length) return [];
+      return [{ label: LX('Arianne: pôr uma personagem em jogo e voltar à mão', 'Arianne: put a character into play and return to hand'), ai: ctx.beforeChallenge && g.activeP === p && c.kneel && t.some(x => g.str(x) >= 3) ? 6 : 0,
+        run: async () => { c.flags.ari = g.phase; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Arianne: escolhe a personagem', 'Arianne: choose the character'), cands: t, min: 1, max: 1, ai: y => g.str(y) + (y.d.cost || 0) }); await g.putIntoPlay(p, x, 'put'); if (c.zone === 'chars') await g.returnToHand(c); } }]; } },
+  '01105': { pt: 'Insight. Cada outra personagem Lord ou Lady Martell tua tem +1 STR por cada plot no teu monte de usados.', en: 'Insight. Each other Martell Lord and Lady character you control gets +1 STR for each plot in your used pile.',
+    strAura: (g, d, c) => c !== d && c.owner === d.owner && c.d.f === 'martell' && isLordLady(c) ? usedPlots(d.owner) : 0 },
+  '01106': { pt: 'Stealth. Ação: paga 1 ouro para o Edric Dayne ganhar um ícone à tua escolha até ao fim da fase.', en: 'Stealth. Action: pay 1 gold to give Edric Dayne a challenge icon of your choice until the end of the phase.',
+    actions: (g, c, ctx) => { const p = c.owner; if (p.gold < 1 || ctx.reaction || (c.phIcons || '').length >= 3) return []; const need = ctx.beforeChallenge && g.activeP === p && !c.kneel ? CH_TYPES.find(t => !g.hasIcon(c, t) && AI_NEW.remaining(g, p, t) > 0) : null;
+      return [{ label: LX('Edric Dayne: ganhar um ícone (1 ouro)', 'Edric Dayne: gain an icon (1 gold)'), ai: need ? 4 : 0, run: async () => { p.gold -= 1; const t = await chooseIcon(g, p, LX('Que ícone?', 'Which icon?'), v => v === need ? 2 : (g.hasIcon(c, v) ? 0 : 1)); c.phIcons = (c.phIcons || '') + ICON_OF[t]; g.log(LX(`Edric Dayne ganha ${CH_NAMES[t]}.`, `Edric Dayne gains ${CH_NAMES[t]}.`)); } }]; } },
+  '01107': { pt: 'Reação: depois de perderes um desafio em que ele participa, uma personagem perde um ícone à tua escolha até ao fim da fase.', en: 'Reaction: after you lose a challenge he took part in, a character loses a challenge icon of your choice until the end of the phase.',
+    afterWin: async (g, c, ch) => { const p = c.owner; if (ch.loser !== p || !participating(g, c)) return; const t = p.opp.chars.filter(x => CH_TYPES.some(ty => g.hasIcon(x, ty))); if (!t.length) return;
+      const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Maester Caleotte: escolhe a personagem', 'Maester Caleotte: choose the character'), cands: t, min: 0, max: 1, ai: y => g.str(y) }); if (!x) return; const ty = await chooseIcon(g, p, LX('Que ícone perde?', 'Which icon does it lose?'), v => g.hasIcon(x, v) ? (AI_NEW.remaining(g, p.opp, v) > 0 ? 2 : 1) : 0); x.phLost = (x.phLost || '') + ICON_OF[ty]; g.log(LX(`${g.cn(x)} perde ${CH_NAMES[ty]}.`, `${g.cn(x)} loses ${CH_NAMES[ty]}.`)); } },
+  '01108': { pt: 'Pode defender em desafios de Poder mesmo ajoelhada.', en: 'May be declared as a defender in Power challenges even while kneeling.', defendKneeling: (g, c, ch) => ch.type === 'power' },
+  '01109': { pt: 'Reação: depois de ganhares um desafio em que ele ataca, ganha 1 poder por cada 5 STR de diferença.', en: 'Reaction: after you win a challenge in which he is attacking, he gains 1 power for every 5 STR you won by.',
+    afterWin: (g, c, ch) => { if (ch.winner === c.owner && ch.attackers.includes(c)) { const n = Math.floor(ch.diff / 5); if (n > 0) g.gainPower(c.owner, n, c); } } },
+  '01110': { pt: 'Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima personagem Martell.', en: 'Marshaling action: kneel so your next Martell character costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.t === 'character' && x.d.f === 'martell', LX('personagem Martell', 'Martell character')) },
+  '01111': { pt: 'Reação: depois de ser declarado atacante, escolhe uma personagem do defensor; ela tem de defender, se puder.', en: 'Reaction: after it is declared as an attacker, choose a character controlled by the defending player; it must defend if able.',
+    afterAttackersDeclared: async (g, c, ch) => { const p = c.owner; if (!ch.attackers.includes(c)) return; const t = ch.def.chars.filter(x => !x.kneel && g.hasIcon(x, ch.type)); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Dornish Paramour: quem tem de defender?', 'Dornish Paramour: who must defend?'), cands: t, min: 0, max: 1, ai: y => -g.str(y) + 5 }); if (x) { (ch.mustDefend = ch.mustDefend || []).push(x); g.log(LX(`${g.cn(x)} terá de defender.`, `${g.cn(x)} must defend.`)); } } },
+  '01112': { pt: 'Reação: ao entrar em jogo, vê as 2 cartas do topo; junta até 1 à mão e põe as outras no fundo.', en: 'Reaction: after it enters play, look at the top 2 cards of your deck; add up to 1 to your hand and place the rest on the bottom.',
+    onEnter: async (g, c) => { const p = c.owner; const top = p.deck.slice(0, 2); if (!top.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Greenblood Trader: escolhe até 1 carta para a mão', 'Greenblood Trader: choose up to 1 card for your hand'), cands: top, min: 0, max: 1, ai: y => AI.handValue(g, p, y) + 1, modal: true });
+      for (const y of top) { g.removeFromZone(y); if (y === x) { g.toZone(y, 'hand'); g.log(LX(`${p.name} junta uma carta à mão.`, `${p.name} adds a card to hand.`)); } else { y.zone = 'deck'; p.deck.push(y); } } } },
+  '01114': { pt: 'Sem anexos. Enquanto não fores o primeiro jogador, ganha ícone de Intriga.', en: 'No attachments. While you are not the first player, gains an Intrigue icon.', icons: (g, c) => g.first !== c.owner ? 'I' : '' },
+  '01115': { pt: 'A personagem tem +1 STR por cada plot no teu monte de usados. Se tiver o trait House Dayne, ganha intimidate.', en: 'The attached character gets +1 STR for each plot in your used pile. With the House Dayne trait, it gains intimidate.',
+    attStr: (g, a) => usedPlots(a.owner), attKw: (g, a, t) => t.d.tr.includes('House Dayne') ? { intimidate: 1 } : {} },
+  '01116': { pt: 'Reação: depois de perderes um desafio como defensor, ajoelha e sacrifica para devolver um atacante à mão do dono.', en: "Reaction: after you lose a challenge as the defending player, kneel and sacrifice it to return an attacking character to its owner's hand.",
+    afterWin: async (g, l, ch) => { const p = l.owner; if (l.kneel || ch.loser !== p || ch.def !== p) return; const t = ch.attackers.filter(x => x.zone === 'chars'); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Ghaston Grey: devolver um atacante à mão? (ou nenhum)', 'Ghaston Grey: return an attacker to hand? (or none)'), cands: t, min: 0, max: 1, ai: y => (y.d.cost || 0) >= 4 ? 10 + (y.d.cost || 0) : 0 }); if (!x) return; l.kneel = true; await g.sacrifice(l); await g.returnToHand(x); } },
+  '01117': { pt: 'Reação: depois de perderes um desafio como defensor, ajoelha para o claim do teu plot subir 1 em desafios desse tipo até ao fim da fase.', en: 'Reaction: after you lose a challenge as the defending player, kneel to raise the claim on your plot by 1 for challenges of that type until the end of the phase.',
+    afterWin: (g, l, ch) => { const p = l.owner; if (l.kneel || ch.loser !== p || ch.def !== p || g.activeP === p || (p.chDone[ch.type] || 0) >= g.maxOfType(p, ch.type)) return; l.kneel = true; p.flags.sunspear = Object.assign({}, p.flags.sunspear, { [ch.type]: g.phase }); g.log(LX(`Sunspear: claim +1 em desafios ${CH_NAMES[ch.type]} nesta fase.`, `Sunspear: claim +1 in ${CH_NAMES[ch.type]} challenges this phase.`)); } },
+  '01118': { pt: 'Limited. Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima carta Martell.', en: 'Limited. Marshaling action: kneel so your next Martell card costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.f === 'martell', LX('carta Martell', 'Martell card')) },
+  '01119': { pt: 'Reação: depois de ganhares um desafio de Intriga por 5 ou mais, ganha X poder (X = plots no teu monte de usados).', en: 'Reaction: after you win an Intrigue challenge by 5 or more, gain X power for your faction (X = plots in your used pile).',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type === 'intrigue' && ch.diff >= 5 && usedPlots(p) > 0, ai: () => 30, run: async (g, p) => g.gainPower(p, usedPlots(p)) } },
+  '01120': { pt: 'Só se não fores o primeiro jogador. Reação: depois de perderes um desafio como defensor, escolhe um tipo; o vencedor não pode iniciar desafios desse tipo nesta fase.', en: 'Only if you are not the first player. Reaction: after you lose a challenge as the defending player, name a challenge type; the winner cannot initiate challenges of that type this phase.',
+    ev: { timing: 'afterLose', cond: (g, p, ch) => g.first !== p && ch.def === p && CH_TYPES.some(t => g.challengeAllowed(ch.winner, t)), ai: () => 10,
+      run: async (g, p, e, ch) => { const w = ch.winner; const t = await chooseIcon(g, p, LX('Unbowed: que tipo fica proibido?', 'Unbowed: which type is banned?'), v => g.challengeAllowed(w, v) ? AI.challengeScore(g, w, v) + 1 : 0); w.flags.banned = Object.assign({}, w.flags.banned, { [t]: g.phase }); g.log(LX(`${w.name} não pode iniciar desafios ${CH_NAMES[t]} nesta fase.`, `${w.name} cannot initiate ${CH_NAMES[t]} challenges this phase.`)); } } },
+  '01121': { pt: 'Ação: uma personagem com STR ≤ 4 perde os ícones Militar, Intriga e Poder até ao fim da fase.', en: 'Action: a character with STR 4 or lower loses a Military, an Intrigue and a Power icon until the end of the phase.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !ctx.reaction && g.allChars().some(c => g.str(c) <= 4), ai: (g, p, ctx) => { if (ctx.preDefense && g.ch && g.ch.att === p) { const t = p.opp.chars.filter(c => !c.kneel && g.hasIcon(c, g.ch.type) && g.str(c) <= 4); const A = g.sideStr(g.ch, 'att'); const D = p.opp.chars.filter(c => !c.kneel && g.hasIcon(c, g.ch.type)).reduce((s, c) => s + g.str(c), 0); if (t.length && D >= A && D - Math.max(...t.map(c => g.str(c))) < A) return 16; } return 0; },
+      run: async (g, p) => { const t = g.allChars().filter(c => g.str(c) <= 4); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Confinement: escolhe a personagem', 'Confinement: choose the character'), cands: t, min: 1, max: 1, ai: y => y.owner === p ? -10 : g.str(y) + (g.ch && !y.kneel && g.hasIcon(y, g.ch.type) ? 5 : 0) }); c.phLost = (c.phLost || '') + 'MIP'; g.log(LX(`${g.cn(c)} perde os ícones até ao fim da fase.`, `${g.cn(c)} loses its icons until the end of the phase.`)); } } },
+
+  // ---------- NIGHT'S WATCH ----------
+  '01123': { pt: 'Sem anexos. Stealth. Reação: a personagem contornada por stealth não pode defender em nenhum desafio até ao fim da fase.', en: 'No attachments. Stealth. Reaction: after Ghost bypasses a character using stealth, that character cannot be declared as a defender for the rest of the phase.',
+    afterStealth: (g, c, s) => { s.flags.noDefend = g.phase; g.log(LX(`Ghost: ${g.cn(s)} não pode defender nesta fase.`, `Ghost: ${g.cn(s)} cannot defend this phase.`)); } },
+  '01124': { pt: "Sem anexos exceto Weapon. Enquanto estiver em pé, participa em cada desafio em que tenhas outra personagem Night's Watch a atacar.", en: "No attachments except Weapon. While standing, he is considered to be participating in each challenge in which you control another attacking Night's Watch character.", attachOnly: 'Weapon',
+    autoParticipate: (g, j, ch) => ch.attackers.some(x => x !== j && g.isFaction(x, 'thenightswatch')) },
+  '01126': { pt: "Com The Wall, não ajoelha ao defender. Interrupção: no fim da fase de desafios, se não perdeste nenhum desafio a defender, põe em jogo uma carta Night's Watch da mão.", en: "While you control The Wall, does not kneel when declared as a defender. Interrupt: when the challenges phase ends, if you lost no challenge as the defending player, put a Night's Watch card into play from your hand.",
+    noKneelDefend: (g, c) => c.owner.locs.some(l => l.code === '01137'),
+    onChallengesEnd: async (g, c) => { const p = c.owner; if (p.flags.lostDef === g.phase) return; const t = p.hand.filter(x => x.d.f === 'thenightswatch' && ['character', 'location', 'attachment'].includes(x.d.t) && !g.uniqueBlockedByDead(p, x) && (x.d.t !== 'attachment' || g.attachTargets(p, x).length)); if (!t.length) return;
+      const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Old Bear Mormont: pôr em jogo uma carta Night\'s Watch da mão (ou nenhuma)', "Old Bear Mormont: put a Night's Watch card into play from your hand (or none)"), cands: t, min: 0, max: 1, ai: y => (y.d.cost || 0) + 1 }); if (x) await g.putIntoPlay(p, x, 'put'); } },
+  '01128': { pt: 'Sem anexos exceto Weapon. Interrupção: quando morre, o adversário descarta 1 carta ao acaso da mão.', en: "No attachments except Weapon. Interrupt: when Ser Waymar Royce is killed, discard 1 card at random from each opponent's hand.", attachOnly: 'Weapon',
+    onLeave: async (g, c, how) => { if (how !== 'killed') return; const q = c.owner.opp; if (!q.hand.length) return; const x = q.hand[Math.floor(Math.random() * q.hand.length)]; g.discardFromHand(q, x); g.log(LX(`Ser Waymar Royce: ${q.name} descarta ${g.cn(x)}.`, `Ser Waymar Royce: ${q.name} discards ${g.cn(x)}.`)); } },
+  '01131': { pt: 'Sem anexos exceto Weapon. Ação: descarta 1 carta da mão para ganhar 1 ouro (1 vez por fase).', en: 'No attachments except Weapon. Action: discard 1 card from your hand to gain 1 gold (once per phase).', attachOnly: 'Weapon',
+    actions: (g, c, ctx) => { const p = c.owner; if (c.flags.ofh === g.phase || !p.hand.length || ctx.reaction) return []; const need = g.phase === 'marshal' && g.activeP === p && p.hand.some(x => x.d.t !== 'event' && g.costOf(p, x, 'marshal') === p.gold + 1) && p.hand.length >= 3;
+      return [{ label: LX('Old Forest Hunter: descartar 1 carta para ganhar 1 ouro', 'Old Forest Hunter: discard 1 card to gain 1 gold'), ai: need ? 50 : 0, run: async () => { c.flags.ofh = g.phase; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe a carta a descartar', 'Choose the card to discard'), cands: [...p.hand], min: 1, max: 1, ai: y => (y.code === '10035' ? 50 : 0) - AI.handValue(g, p, y) }); g.discardFromHand(p, x); p.gold += 1; g.log(LX(`${p.name} descarta ${g.cn(x)} e ganha 1 ouro.`, `${p.name} discards ${g.cn(x)} and gains 1 gold.`), 'gold'); } }]; } },
+  '01138': { pt: 'Reação: depois de o adversário recolher rendimento, move 1 ouro do gold pool dele para o teu (máx. 1 por ronda).', en: "Reaction: after an opponent collects income, move 1 gold from their gold pool to yours (max 1 per round)." },
+  '01140': { pt: "Só num desafio com uma personagem Night's Watch tua a participar. Reação: depois de ganhares por 5 ou mais como defensor, o adversário não pode iniciar mais desafios contra ti nesta ronda.", en: "Only during a challenge with a participating Night's Watch character you control. Reaction: after you win by 5 or more as the defending player, the loser cannot initiate challenges against you this round.",
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.def === p && ch.diff >= 5 && ch.defenders.some(c => g.isFaction(c, 'thenightswatch')) && CH_TYPES.some(t => g.challengeAllowed(ch.att, t)), ai: () => 20,
+      run: async (g, p, e, ch) => { ch.att.flags.noChallengeRound = true; g.log(LX(`${ch.att.name} não pode iniciar mais desafios nesta ronda.`, `${ch.att.name} cannot initiate more challenges this round.`)); } } },
+
+  // ---------- TARGARYEN ----------
+  '01172': { pt: 'Só Dothraki. +2 STR. No Khal Drogo, ele não ajoelha ao atacar no primeiro desafio Militar que iniciares em cada ronda.', en: 'Dothraki character only. +2 STR. On Khal Drogo, he does not kneel when attacking in the first Military challenge you initiate each round.',
+    attachOk: (g, a, t) => t.d.tr.includes('Dothraki'), attStr: () => 2 },
+  '01174': { pt: 'Reação: depois de ganhares um desafio de Poder, sacrifica para pôr em jogo uma Dothraki da mão; no fim da fase, se ainda estiver em jogo, volta à mão.', en: 'Reaction: after you win a Power challenge, sacrifice it to put a Dothraki character into play from your hand; at the end of the phase, if still in play, return it to your hand.',
+    afterWin: async (g, l, ch) => { const p = l.owner; if (ch.winner !== p || ch.type !== 'power') return; const t = p.hand.filter(x => x.d.t === 'character' && x.d.tr.includes('Dothraki') && !g.uniqueBlockedByDead(p, x)); if (!t.length) return;
+      const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Dothraki Sea: sacrificar para pôr uma Dothraki em jogo? (ou nenhuma)', 'Dothraki Sea: sacrifice to put a Dothraki into play? (or none)'), cands: t, min: 0, max: 1, ai: y => g.str(y) - 3 }); if (!x) return; await g.sacrifice(l); const r = await g.putIntoPlay(p, x, 'put'); if (r && r.zone === 'chars') { const tok = Math.random(); r.flags.dsea = tok; g.endOfPhase.push(async () => { if (r.zone === 'chars' && r.flags.dsea === tok) { g.log(LX(`Dothraki Sea: ${g.cn(r)} volta à mão.`, `Dothraki Sea: ${g.cn(r)} returns to hand.`)); await g.returnToHand(r); } }); } } },
+
+  // ---------- TYRELL ----------
+  '01179': { pt: 'Sem anexos exceto Weapon. Enquanto controlares o Right: +1 STR, ícone de Poder e não ajoelha ao defender.', en: 'No attachments except Weapon. While you control Right: +1 STR, gains a Power icon and does not kneel when declared as a defender.', attachOnly: 'Weapon',
+    str: (g, c) => c.owner.chars.some(x => x.code === '01184') ? 1 : 0, icons: (g, c) => c.owner.chars.some(x => x.code === '01184') ? 'P' : '', noKneelDefend: (g, c) => c.owner.chars.some(x => x.code === '01184') },
+  '01184': { pt: 'Sem anexos exceto Weapon. Enquanto controlares o Left: +1 STR, ícone de Intriga e não ajoelha ao defender.', en: 'No attachments except Weapon. While you control Left: +1 STR, gains an Intrigue icon and does not kneel when declared as a defender.', attachOnly: 'Weapon',
+    str: (g, c) => c.owner.chars.some(x => x.code === '01179') ? 1 : 0, icons: (g, c) => c.owner.chars.some(x => x.code === '01179') ? 'I' : '', noKneelDefend: (g, c) => c.owner.chars.some(x => x.code === '01179') },
+  '01180': { pt: 'Reação: depois de ganhares um desafio de Intriga como defensor, o atacante descarta 1 carta ao acaso da mão.', en: "Reaction: after you win an Intrigue challenge as the defending player, discard 1 card at random from the attacking player's hand.",
+    afterWin: async (g, c, ch) => { const p = c.owner, q = ch.att; if (ch.winner !== p || ch.def !== p || ch.type !== 'intrigue' || !q.hand.length) return; const x = q.hand[Math.floor(Math.random() * q.hand.length)]; g.discardFromHand(q, x); g.log(LX(`Maester Lomys: ${q.name} descarta ${g.cn(x)}.`, `Maester Lomys: ${q.name} discards ${g.cn(x)}.`)); await g.flushPending(); } },
+  '01181': { pt: 'Ação de desafios: ajoelha a Margaery para uma personagem ganhar +3 STR até ao fim da fase.', en: 'Challenges action: kneel Margaery to give a character +3 STR until the end of the phase.',
+    actions: (g, c, ctx) => { const p = c.owner; if (c.kneel || g.phase !== 'challenges' || ctx.reaction) return []; const t = p.chars.filter(x => x !== c);
+      return [{ label: LX('Margaery: +3 STR a uma personagem', 'Margaery: +3 STR to a character'), ai: g.ch ? pumpScoreP(g, p, 3) : 0, run: async () => { const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Margaery: escolhe a personagem', 'Margaery: choose the character'), cands: g.allChars(), min: 1, max: 1, ai: y => y.owner !== p ? -20 : (participating(g, y) ? 10 : 0) + g.str(y) }); c.kneel = true; g.pump(x, 3, 'phase'); g.log(LX(`${g.cn(x)} ganha +3 STR.`, `${g.cn(x)} gets +3 STR.`)); } }]; } },
+  '01182': { pt: 'O primeiro evento que jogares em cada ronda custa menos 1. +1 Income.', en: 'The first event you play each round costs 1 less. +1 Income.' },
+  '01183': { pt: 'Renown. Reação: depois de a STR dele aumentar por um efeito de carta, levanta-o (2 vezes por fase).', en: 'Renown. Reaction: after his STR is increased by a card effect, stand him (twice per phase).',
+    afterPumped: (g, c) => { if (!c.kneel || !g.canStand(c)) return; const k = (c.flags.rt && c.flags.rt.ph === g.phase) ? c.flags.rt.n : 0; if (k >= 2) return; c.flags.rt = { ph: g.phase, n: k + 1 }; c.kneel = false; g.log(LX('Randyll Tarly levanta-se.', 'Randyll Tarly stands.')); } },
+  '01185': { pt: 'Renown. Enquanto atacar sozinho, o defensor só pode declarar 1 personagem a defender.', en: 'Renown. While attacking alone, the defending player cannot declare more than 1 defender.' },
+  '01186': { pt: 'Reação: depois de ganhares um desafio de Intriga em que ela participa, põe em jogo da mão uma personagem Tyrell com custo impresso ≤ 6.', en: 'Reaction: after you win an Intrigue challenge she took part in, put a Tyrell character with printed cost 6 or lower into play from your hand.',
+    afterWin: async (g, c, ch) => { const p = c.owner; if (ch.winner !== p || ch.type !== 'intrigue' || !participating(g, c)) return; const t = p.hand.filter(x => x.d.t === 'character' && x.d.f === 'tyrell' && (x.d.cost || 0) <= 6 && !g.uniqueBlockedByDead(p, x)); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('The Queen of Thorns: escolhe a personagem Tyrell', 'The Queen of Thorns: choose the Tyrell character'), cands: t, min: 0, max: 1, ai: y => (y.d.cost || 0) + 1 }); if (x) await g.putIntoPlay(p, x, 'put'); } },
+  '01188': { pt: 'Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima personagem Tyrell.', en: 'Marshaling action: kneel so your next Tyrell character costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.t === 'character' && x.d.f === 'tyrell', LX('personagem Tyrell', 'Tyrell character')) },
+  '01189': { pt: 'Ambush (4). Reação: depois de entrar em jogo na fase de desafios, escolhe um tipo; podes iniciar mais um desafio desse tipo nesta fase.', en: 'Ambush (4). Reaction: after it enters play during the challenges phase, name a challenge type; you may initiate an additional challenge of that type this phase.',
+    onEnter: async (g, c) => { const p = c.owner; if (g.phase !== 'challenges') return; const t = await chooseIcon(g, p, LX("Olenna's Informant: que tipo de desafio extra?", "Olenna's Informant: which extra challenge type?"), v => AI.challengeScore(g, p, v) + 1); p.flags.extraCh = Object.assign({}, p.flags.extraCh, { [t]: g.phase }); g.log(LX(`${p.name} pode iniciar mais um desafio ${CH_NAMES[t]}.`, `${p.name} may initiate an extra ${CH_NAMES[t]} challenge.`)); } },
+  '01190': { pt: 'Sem anexos. +1 STR por cada local The Reach que controlas.', en: 'No attachments. +1 STR for each The Reach location you control.', str: (g, c) => c.owner.locs.filter(l => l.d.tr.includes('The Reach')).length },
+  '01191': { pt: 'Só personagem Tyrell. Ação: enquanto a personagem participa num desafio, ajoelha o Heartsbane para lhe dar +3 STR até ao fim do desafio.', en: 'Tyrell character only. Action: while the attached character is participating, kneel Heartsbane to give it +3 STR until the end of the challenge.',
+    attachOk: (g, a, t) => t.d.f === 'tyrell',
+    actions: (g, a, ctx) => { const p = a.owner; if (a.kneel || !a.parent || !participating(g, a.parent) || ctx.reaction) return []; return [{ label: LX('Heartsbane: +3 STR', 'Heartsbane: +3 STR'), ai: pumpScoreP(g, p, 3), run: async () => { a.kneel = true; g.pump(a.parent, 3); g.log(LX(`${g.cn(a.parent)} ganha +3 STR.`, `${g.cn(a.parent)} gets +3 STR.`)); } }]; } },
+  '01192': { pt: 'Ação de desafios: ajoelha Highgarden e paga 1 ouro para levantar um atacante e retirá-lo do desafio.', en: 'Challenges action: kneel Highgarden and pay 1 gold to choose an attacking character; stand it and remove it from the challenge.',
+    actions: (g, l, ctx) => { const p = l.owner, ch = g.ch; if (l.kneel || !ch || p.gold < 1 || ctx.reaction) return []; const t = ch.attackers.filter(x => x.zone === 'chars'); if (!t.length) return [];
+      const ai = ch.def === p ? (() => { const A = g.sideStr(ch, 'att'), D = g.sideStr(ch, 'def'); const best = Math.max(...t.map(x => g.str(x))); return D <= A && D > A - best ? 22 : 0; })() : 0;
+      return [{ label: LX('Highgarden: retirar um atacante (1 ouro)', 'Highgarden: remove an attacker (1 gold)'), ai, run: async () => { const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Highgarden: escolhe o atacante', 'Highgarden: choose the attacker'), cands: t, min: 1, max: 1, ai: y => y.owner === p ? 0 : g.str(y) }); l.kneel = true; p.gold -= 1; ch.attackers = ch.attackers.filter(y => y !== x); x.kneel = false; g.log(LX(`${g.cn(x)} levanta-se e sai do desafio.`, `${g.cn(x)} stands and is removed from the challenge.`)); } }]; } },
+  '01193': { pt: 'Reação: depois de ganhares um desafio por 5 ou mais, ajoelha The Mander para comprar 2 cartas.', en: 'Reaction: after you win a challenge by 5 or more, kneel The Mander to draw 2 cards.',
+    afterWin: (g, l, ch) => { if (ch.winner !== l.owner || ch.diff < 5 || l.kneel) return; l.kneel = true; g.log('The Mander:'); g.draw(l.owner, 2); } },
+  '01194': { pt: 'Limited. Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima carta Tyrell.', en: 'Limited. Marshaling action: kneel so your next Tyrell card costs 1 less.',
+    actions: (g, c) => reducerAct(g, c, 1, x => x.d.f === 'tyrell', LX('carta Tyrell', 'Tyrell card')) },
+  '01195': { pt: 'Ação de desafios: até 3 personagens Tyrell ganham +2 STR até ao fim da fase.', en: 'Challenges action: up to three Tyrell characters each get +2 STR until the end of the phase.',
+    ev: { timing: 'action', cond: (g, p, ctx) => g.phase === 'challenges' && !ctx.reaction && p.chars.some(c => c.d.f === 'tyrell'), ai: (g, p) => { if (!g.ch) return 0; const n = p.chars.filter(c => c.d.f === 'tyrell' && participating(g, c)).length; return n ? AI.pumpScore(g, p, g.ch, 2 * Math.min(3, n)) : 0; },
+      run: async (g, p) => { const t = p.chars.filter(c => c.d.f === 'tyrell'); const cs = await p.ctrl.chooseCards(g, p, { prompt: LX('Growing Strong: escolhe até 3 personagens Tyrell', 'Growing Strong: choose up to three Tyrell characters'), cands: t, min: 1, max: 3, ai: y => (participating(g, y) ? 10 : 1) }); for (const c of cs) g.pump(c, 2, 'phase'); g.log(LX(`Growing Strong: ${cs.map(c => g.cn(c)).join(', ')} +2 STR.`, `Growing Strong: ${cs.map(c => g.cn(c)).join(', ')} +2 STR.`)); } } },
+  '01196': { pt: 'Reação: depois de ganhares um desafio de Intriga ou Poder, o adversário nomeia um tipo de carta; procura no baralho uma carta de outro tipo e junta-a à mão.', en: 'Reaction: after you win an Intrigue or Power challenge, the losing opponent names a card type; search your deck for a card of a different type and add it to your hand.',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type !== 'military' && p.deck.length > 0, ai: () => 12,
+      run: async (g, p, e, ch) => { const q = ch.loser; const types = ['character', 'location', 'attachment', 'event']; const named = await q.ctrl.chooseOption(g, q, { prompt: LX("Olenna's Cunning: nomeia um tipo de carta", "Olenna's Cunning: name a card type"), options: types.map(t => ({ label: TYPE_PT[t], value: t })), ai: o => o.value === 'character' ? 1 : 0 });
+        g.log(LX(`${q.name} nomeia ${TYPE_PT[named]}.`, `${q.name} names ${TYPE_PT[named]}.`)); const t = p.deck.filter(c => c.d.t !== named && c.d.t !== 'plot'); if (!t.length) return; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe a carta do baralho', 'Choose the card from your deck'), cands: t, min: 1, max: 1, ai: y => AI.handValue(g, p, y), modal: true }); g.removeFromZone(c); g.toZone(c, 'hand'); shuffle(p.deck); g.log(LX(`${p.name} junta uma carta à mão.`, `${p.name} adds a card to hand.`)); } } },
+  '01197': { pt: 'Ação: vê as 5 cartas do topo do baralho de um jogador; põe até 3 no fundo e as outras no topo.', en: "Action: look at the top 5 cards of a player's deck; place up to 3 on the bottom and the rest on top.",
+    ev: { timing: 'action', cond: (g, p, ctx) => !ctx.reaction, ai: (g, p) => g.phase === 'taxation' || (g.phase === 'dominance') ? 3 : 0,
+      run: async (g, p) => { const q = await p.ctrl.chooseOption(g, p, { prompt: LX('The Bear and the Maiden Fair: baralho de que jogador?', 'The Bear and the Maiden Fair: whose deck?'), options: [{ label: LX('O meu', 'Mine'), value: p }, { label: p.opp.name, value: p.opp }], ai: o => o.value === p ? 1 : 0 });
+        const top = q.deck.slice(0, 5); if (!top.length) return; const bottom = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe até 3 cartas para o fundo do baralho', 'Choose up to 3 cards for the bottom of the deck'), cands: top, min: 0, max: 3, ai: y => q === p ? -AI.handValue(g, p, y) + 4 : AI.handValue(g, q, y), modal: true });
+        for (const c of bottom) { q.deck.splice(q.deck.indexOf(c), 1); q.deck.push(c); } g.log(LX(`${p.name} reorganiza o topo do baralho de ${q.name}.`, `${p.name} rearranges the top of ${q.name}'s deck.`)); } } },
+};
+for (const [code, e] of Object.entries(CORE2)) { AB[code] = e; if (e.en) AB_EN[code] = e.en; }
+// Khal Drogo com Drogo's Arakh: não ajoelha no primeiro desafio Militar da ronda
+(function () { const kd = AB['01162']; const prev = kd.noKneelAttack; kd.noKneelAttack = (g, c, t) => (prev && prev(g, c, t)) || (t === 'military' && c.att.some(a => a.code === '01172') && !(c.owner.chDone.military > 1)); })();
+
 // ================= INTERFACE (PT / EN) =================
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const TYPE_PT = i18nObj({ character: 'Personagem', location: 'Local', attachment: 'Anexo', event: 'Evento', plot: 'Plot', agenda: 'Agenda' },
-  { character: 'Character', location: 'Location', attachment: 'Attachment', event: 'Event', plot: 'Plot', agenda: 'Agenda' });
 const KW_PT = i18nObj({ renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'Sem anexos', terminal: 'Terminal' },
   { renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'No attachments', terminal: 'Terminal' });
 const store = {
@@ -2205,7 +2429,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v0.8';
+const APP_VERSION = 'v0.9';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
