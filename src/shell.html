@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Westeros LCG — Simulador AGoT 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>/*CSS*/</style>
+</head>
+<body>
+<header><h1>WESTEROS LCG</h1><nav><button data-t="play"></button><button data-t="decks"></button><button data-t="help"></button></nav><span class="note" id="tagline" style="margin-left:auto"></span><button id="imgBtn"></button><button id="langBtn"></button></header>
+<section id="lobby" class="screen"></section>
+<section id="game" class="screen">
+  <aside id="gside"></aside>
+  <main id="gcenter"><div id="board"></div><div id="prompt"></div><div id="hand"></div><div style="display:none" id="oppHand"></div></main>
+  <aside id="gright"><div id="preview" class="pvbox"></div><div id="log"></div></aside>
+</section>
+<section id="decks" class="screen"><aside id="dlist"></aside><main id="pool"></main><aside id="dside"><div class="pvbox panel" style="min-height:120px;padding:10px"></div><div id="dsideIn"></div></aside></section>
+<section id="help" class="screen"></section>
+<script>/*JS*/</script>
+</body>
+</html>

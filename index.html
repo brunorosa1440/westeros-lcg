@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Westeros LCG — Simulador AGoT 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>:root{--bg:#0d0e12;--panel:#17191f;--panel2:#1f222a;--line:#2e323c;--gold:#d9a642;--gold2:#f0c96a;--txt:#e6e1d6;--dim:#8d8a83;--red:#c0392b;--green:#3f9d5a;--blue:#3c6fb0;
+--f-stark:#c9ccd1;--f-lannister:#a8231d;--f-baratheon:#d8b21f;--f-greyjoy:#1f4f6b;--f-martell:#d97a1e;--f-thenightswatch:#3a3a3a;--f-targaryen:#6e1414;--f-tyrell:#2f6b2a;--f-neutral:#8a7a5c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:radial-gradient(ellipse at top,#1b1d26 0%,var(--bg) 60%);color:var(--txt);font-family:'Inter',system-ui,sans-serif;font-size:13px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);padding:6px 12px;border-radius:6px}
+button:hover:not(:disabled){border-color:var(--gold);color:var(--gold2)}
+button:disabled{opacity:.4;cursor:default}
+button.pri{background:linear-gradient(#c8952f,#9c6f1c);color:#1a1205;border-color:#e0b552;font-weight:600}
+button.pri:hover:not(:disabled){color:#000;filter:brightness(1.1)}
+button.warn{border-color:#7a2a24}
+input,select,textarea{font:inherit;background:#0f1116;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+header{display:flex;align-items:center;gap:18px;padding:8px 16px;background:#08090c;border-bottom:1px solid #2a2418}
+header h1{font-family:'Cinzel',serif;font-size:20px;margin:0;letter-spacing:2px;color:var(--gold2);font-weight:600}
+header nav{display:flex;gap:4px}
+header nav button{background:none;border:none;color:var(--gold);font-family:'Cinzel',serif;font-size:15px;padding:6px 10px}
+header nav button.on{color:#fff;border-bottom:2px solid var(--gold)}
+.screen{display:none;height:calc(100vh - 47px)}
+.screen.on{display:flex}
+/* ---------- cartas ---------- */
+.card{position:relative;width:90px;height:132px;border-radius:7px;background:#e9dfc6;color:#1d1a14;border:2px solid #222;box-shadow:0 2px 6px #0009;overflow:hidden;user-select:none;flex:none;transition:transform .15s}
+.card .hd{height:27px;background:var(--fc);color:#fff;font-size:9px;line-height:1.1;font-weight:700;padding:2px 3px 0 22px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 1px #000}
+.card.fac-stark .hd{color:#111;text-shadow:none}
+.card .cost{position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:radial-gradient(#ffd877,#b8861e);color:#2a1c00;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;border:1px solid #5a3d00}
+.card .body{padding:3px 4px;font-size:9px;line-height:1.15}
+.card .ty{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:#6b5f48}
+.card .tr{font-style:italic;font-size:8.5px;color:#4a4232;margin-top:1px}
+.card .icons{position:absolute;left:3px;top:52px;display:flex;flex-direction:column;gap:2px}
+.ic{display:inline-flex;width:15px;height:15px;border-radius:3px;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff}
+.ic.M{background:#b3261e}.ic.I{background:#2b8a3e}.ic.P{background:#c99a17}
+.card .str{position:absolute;left:2px;bottom:2px;width:22px;height:22px;border-radius:4px;background:#3b3b3b;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;border:1px solid #000}
+.card .str.up{background:#2f7d43}.card .str.down{background:#8a2a20}
+.card .kw{position:absolute;left:26px;right:3px;bottom:3px;font-size:8px;font-weight:700;color:#3a2f1d;line-height:1.1}
+.card .mid{position:absolute;left:4px;right:3px;top:50px;font-size:8.5px;color:#3b3427;line-height:1.15}
+.card .warn{position:absolute;right:2px;top:29px;font-size:10px}
+.card .badges{position:absolute;right:2px;bottom:2px;display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.tok{border-radius:10px;padding:0 5px;font-size:10px;font-weight:800;color:#fff;border:1px solid #000;line-height:15px}
+.tok.pow{background:#7b3fb0}.tok.dup{background:#555}.tok.gold{background:#b8861e}
+.card.back{background:repeating-linear-gradient(45deg,#3a2414,#3a2414 6px,#2c1a0e 6px,#2c1a0e 12px);border-color:#6d4a22}
+.card.plotc{width:126px;height:88px}
+.card.plotc .pst{position:absolute;bottom:3px;left:4px;right:4px;display:flex;justify-content:space-between;font-size:9px;font-weight:700}
+.slot{position:relative;width:94px;height:138px;display:flex;align-items:flex-start;justify-content:center;flex:none}
+.slot.kneel{width:138px}
+.slot.kneel>.card{transform:rotate(90deg) translate(22px,0)}
+.slot .atts{position:absolute;left:0;right:0;bottom:-6px;display:flex;flex-direction:column;gap:1px;z-index:2}
+.slot.kneel .atts{left:18px;right:18px}
+.attc{background:#cfc2a0;color:#1d1a14;border:1px solid #333;border-radius:3px;font-size:9px;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.attc.kn{opacity:.6;font-style:italic}
+.cand{outline:3px solid #46d06a;outline-offset:1px;cursor:pointer;box-shadow:0 0 12px #46d06a}
+.sel{outline:3px solid #f0c96a!important;box-shadow:0 0 14px #f0c96a!important}
+.act{outline:2px dashed #46d06a;outline-offset:1px;cursor:pointer}
+.card.atk::after,.card.def::after{position:absolute;top:44px;right:2px;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;color:#fff}
+.card.atk::after{content:'ATQ';background:#b3261e}.card.def::after{content:'DEF';background:#2f5d9c}
+.card.blank{filter:grayscale(.7)}
+/* ---------- tabuleiro ---------- */
+#game{gap:0}
+#gside{width:230px;display:flex;flex-direction:column;gap:8px;padding:8px;border-right:1px solid var(--line);background:#0b0c10cc;overflow:auto}
+.pp{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+.pp.me{border-color:#5a4a26}
+.pp .nm{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);display:flex;justify-content:space-between;align-items:center}
+.stats{display:flex;gap:6px;margin:6px 0;flex-wrap:wrap}
+.stat{background:#0f1116;border:1px solid var(--line);border-radius:14px;padding:2px 8px;font-weight:700}
+.stat.p{color:#c99cf0}.stat.g{color:#f0c96a}
+.piles{display:flex;gap:4px;flex-wrap:wrap}
+.piles button{padding:2px 6px;font-size:11px}
+.fbadge{font-size:11px;padding:2px 6px;border-radius:4px;color:#fff;background:var(--fc);text-shadow:0 1px 2px #000}
+.fbadge.kn{opacity:.5;text-decoration:line-through}
+.phasebox{background:#2b1d4a;border:1px solid #5a3f93;border-radius:8px;padding:8px;text-align:center}
+.phasebox b{display:block;font-family:'Cinzel',serif;font-size:15px;letter-spacing:1px}
+.mini-plot{margin-top:6px}
+#gcenter{flex:1;display:flex;flex-direction:column;min-width:0}
+#board{flex:1;overflow:auto;padding:6px 10px;display:flex;flex-direction:column;gap:4px}
+.row{display:flex;gap:6px;min-height:142px;align-items:flex-start;flex-wrap:wrap;padding:2px;border-radius:8px}
+.row.locs{min-height:142px;background:#ffffff05}
+.row .lbl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.divider{display:flex;align-items:center;gap:10px;min-height:34px;margin:2px 0}
+.divider .ln{flex:1;height:1px;background:linear-gradient(90deg,transparent,#5a4a26,transparent)}
+.chb{background:#2a1414;border:1px solid #7a2a24;border-radius:20px;padding:5px 14px;font-weight:700}
+.chb .a{color:#ff8b7e}.chb .d{color:#8fb4ff}
+#prompt{background:#141720;border-top:1px solid #3b3220;border-bottom:1px solid #3b3220;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:48px}
+#prompt .txt{flex:1;min-width:200px;font-weight:600;color:var(--gold2)}
+#prompt .txt.wait{color:var(--dim);font-weight:400}
+#hand{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;min-height:150px;background:#0a0b0e}
+#oppHand{display:flex;gap:3px;padding:2px 0}
+#oppHand .card{width:28px;height:40px;border-width:1px}
+#gright{width:290px;display:flex;flex-direction:column;border-left:1px solid var(--line);background:#0b0c10cc}
+#preview{height:330px;padding:10px;border-bottom:1px solid var(--line);overflow:auto}
+.pvbox .pv-name{font-family:'Cinzel',serif;font-size:16px;color:var(--gold2)}
+.pvbox .pv-meta{color:var(--dim);margin:4px 0}
+.pvbox .pv-row{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.pvbox .pv-txt{background:#0f1116;border:1px solid var(--line);border-radius:6px;padding:8px;line-height:1.45;margin-top:6px}
+.pvbox .pv-warn{color:#f0a35a}
+#log{flex:1;overflow:auto;padding:8px 10px;font-size:12px;line-height:1.45}
+#log div{border-bottom:1px solid #ffffff08;padding:1px 0}
+#log .phase{color:var(--gold2);font-family:'Cinzel',serif;margin-top:6px}
+#log .ch{color:#ffb4a8}#log .chw{color:#ffd36a;font-weight:600}#log .kill{color:#ff7a6a}#log .pow{color:#c99cf0}#log .gold{color:#e8c46a}#log .dim{color:var(--dim)}#log .win{color:#7dff9a;font-weight:700;font-size:14px}#log .ev{color:#9fd3ff}
+.menu{position:fixed;z-index:50;background:#1b1e26;border:1px solid var(--gold);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:3px;box-shadow:0 6px 20px #000}
+.menu button{text-align:left}
+.modal{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:40}
+.modal .box{background:var(--panel);border:1px solid #5a4a26;border-radius:10px;max-width:min(980px,94vw);max-height:88vh;overflow:auto;padding:14px 16px}
+.modal h3{margin:0 0 10px;font-family:'Cinzel',serif;color:var(--gold2)}
+.cgrid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.overlay-win{font-family:'Cinzel',serif;font-size:26px;color:var(--gold2);text-align:center;margin:6px 0 12px}
+/* ---------- ecrãs de menu ---------- */
+.wrap{flex:1;overflow:auto;padding:20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.panel h2{margin:0 0 10px;font-family:'Cinzel',serif;color:var(--gold2);font-size:18px}
+.lobby{max-width:760px;margin:0 auto}
+.lobby label{display:block;color:var(--dim);margin:10px 0 4px}
+.lobby select{width:100%}
+.note{color:var(--dim);font-size:12px;line-height:1.5}
+/* ---------- deckbuilder ---------- */
+#decks{gap:0}
+#dlist{width:220px;border-right:1px solid var(--line);padding:10px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+#dlist .di{padding:7px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+#dlist .di:hover{background:var(--panel2)}
+#dlist .di.on{border-color:var(--gold);background:#2a2316}
+#dlist .di small{display:block;color:var(--dim)}
+#pool{flex:1;display:flex;flex-direction:column;min-width:0;padding:10px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.filters button.on{border-color:var(--gold);color:var(--gold2);background:#2a2316}
+.tbl{flex:1;overflow:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse}
+th{position:sticky;top:0;background:#1d2029;text-align:left;font-weight:600;color:var(--dim);padding:6px;font-size:12px;z-index:1}
+td{padding:4px 6px;border-top:1px solid #ffffff0a}
+tr:hover td{background:#ffffff06}
+.qty{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.qty button{border:none;border-radius:0;padding:2px 8px;background:#0f1116}
+.qty button.on{background:var(--blue);color:#fff}
+#dside{width:330px;border-left:1px solid var(--line);padding:10px;overflow:auto}
+#dside .grp{margin-top:8px}
+#dside .grp h4{margin:6px 0 2px;color:var(--gold);font-size:12px;text-transform:uppercase;letter-spacing:1px}
+#dside .ln{display:flex;justify-content:space-between;padding:1px 0;cursor:default}
+.valid{padding:6px 8px;border-radius:6px;margin:8px 0;font-weight:600}
+.valid.ok{background:#1d3b25;color:#8fe0a5}.valid.bad{background:#3b1d1d;color:#ff9c90}
+.fdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--fc);vertical-align:middle;margin-right:4px;border:1px solid #000}
+.help{max-width:900px;margin:0 auto;line-height:1.55}
+.help code{background:#0f1116;padding:1px 4px;border-radius:4px}
+.autolist{columns:2;font-size:12px}
+@media (max-width:1100px){#gright{width:230px}#preview{height:260px}}
+
+.fbadge.f-stark{color:#111;text-shadow:none}
+/* ---------- imagens ---------- */
+.card .cimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:5px;z-index:1;opacity:0}
+.card.hasimg .cimg{opacity:1}
+.card.plotc .cimg{object-fit:cover}
+.card .ov{position:absolute;left:2px;bottom:2px;z-index:3;display:flex;flex-direction:column;gap:2px;align-items:flex-start;pointer-events:none}
+.card:not(.hasimg) .ov{display:none}
+.ovstr{min-width:22px;height:22px;border-radius:4px;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;border:1px solid #000;box-shadow:0 0 4px #000}
+.ovstr.up{background:#2f7d43}.ovstr.down{background:#8a2a20}
+.ovic{display:flex;gap:1px}
+.card .badges,.card .warn,.card.atk::after,.card.def::after{z-index:3}
+.card.blank.hasimg .cimg{filter:grayscale(.8)}
+.pvimg{display:none;width:100%;max-width:230px;margin:0 auto 8px;border-radius:10px;box-shadow:0 4px 14px #000}
+.pvimg.plot{max-width:270px}
+.pvimg.ok{display:block}
+#preview{height:auto;max-height:58vh}
+.pgrid{display:flex;flex-wrap:wrap;gap:10px;padding:10px}
+.pcell{display:flex;flex-direction:column;align-items:center;gap:4px}
+.card.big{width:120px;height:170px}
+.card.big .hd{font-size:10.5px}
+.toast{position:fixed;right:16px;bottom:16px;z-index:60;max-width:420px;background:#2a2316;border:1px solid var(--gold);border-radius:8px;padding:10px 14px;box-shadow:0 6px 20px #000;cursor:pointer;line-height:1.4}
+#langBtn,#imgBtn{padding:4px 10px;font-size:12px}
+</style>
+</head>
+<body>
+<header><h1>WESTEROS LCG</h1><nav><button data-t="play"></button><button data-t="decks"></button><button data-t="help"></button></nav><span class="note" id="tagline" style="margin-left:auto"></span><button id="imgBtn"></button><button id="langBtn"></button></header>
+<section id="lobby" class="screen"></section>
+<section id="game" class="screen">
+  <aside id="gside"></aside>
+  <main id="gcenter"><div id="board"></div><div id="prompt"></div><div id="hand"></div><div style="display:none" id="oppHand"></div></main>
+  <aside id="gright"><div id="preview" class="pvbox"></div><div id="log"></div></aside>
+</section>
+<section id="decks" class="screen"><aside id="dlist"></aside><main id="pool"></main><aside id="dside"><div class="pvbox panel" style="min-height:120px;padding:10px"></div><div id="dsideIn"></div></aside></section>
+<section id="help" class="screen"></section>
+<script>const CARDS=[{"c":"01001","n":"A Clash of Kings","t":"plot","f":"neutral","tr":["Noble"],"lim":2,"p":[4,9,1,6]},{"c":"01002","n":"A Feast for Crows","t":"plot","f":"neutral","tr":["Edict"],"lim":1,"p":[6,1,1,4]},{"c":"01003","n":"A Game of Thrones","t":"plot","f":"neutral","tr":["Scheme"],"lim":1,"p":[4,2,1,6]},{"c":"01004","n":"A Noble Cause","t":"plot","f":"neutral","tr":["Kingdom","Noble"],"lim":2,"p":[5,0,1,6]},{"c":"01005","n":"A Storm of Swords","t":"plot","f":"neutral","tr":["War"],"lim":2,"p":[3,8,1,5]},{"c":"01006","n":"Building Orders","t":"plot","f":"neutral","tr":["Kingdom"],"lim":2,"p":[4,1,1,7]},{"c":"01007","n":"Calling the Banners","t":"plot","f":"neutral","tr":["Kingdom"],"lim":2,"p":[3,6,1,6]},{"c":"01008","n":"Calm Over Westeros","t":"plot","f":"neutral","tr":["Summer"],"lim":1,"p":[5,3,1,6]},{"c":"01009","n":"Confiscation","t":"plot","f":"neutral","tr":["Edict"],"lim":2,"p":[4,5,1,6]},{"c":"01010","n":"Counting Coppers","t":"plot","f":"neutral","tr":["Kingdom"],"lim":2,"p":[2,3,1,10]},{"c":"01011","n":"Filthy Accusations","t":"plot","f":"neutral","tr":["Scheme"],"lim":2,"p":[4,4,1,6]},{"c":"01012","n":"Fortified Position","t":"plot","f":"neutral","tr":["Siege","War"],"lim":1,"p":[5,1,1,5]},{"c":"01013","n":"Heads on Spikes","t":"plot","f":"neutral","tr":["Edict","War"],"lim":2,"p":[4,6,1,6]},{"c":"01014","n":"Jousting Contest","t":"plot","f":"neutral","tr":["War"],"lim":2,"p":[4,3,1,6]},{"c":"01015","n":"Marched to the Wall","t":"plot","f":"neutral","tr":["Edict"],"lim":2,"p":[4,8,1,5]},{"c":"01016","n":"Marching Orders","t":"plot","f":"neutral","tr":["Edict","War"],"lim":2,"p":[9,3,1,4]},{"c":"01017","n":"Naval Superiority","t":"plot","f":"neutral","tr":["Siege","War"],"lim":1,"p":[2,7,1,6]},{"c":"01018","n":"Power Behind the Throne","t":"plot","f":"neutral","tr":["Noble","Scheme"],"lim":2,"p":[3,1,1,6]},{"c":"01019","n":"Rebuilding","t":"plot","f":"neutral","tr":["Kingdom"],"lim":2,"p":[5,5,1,6]},{"c":"01020","n":"Reinforcements","t":"plot","f":"neutral","tr":["Kingdom","War"],"lim":2,"p":[1,0,1,6]},{"c":"01021","n":"Sneak Attack","t":"plot","f":"neutral","tr":["Scheme"],"lim":2,"p":[5,11,2,5]},{"c":"01022","n":"Summons","t":"plot","f":"neutral","tr":["Kingdom"],"lim":2,"p":[4,0,1,7]},{"c":"01023","n":"Supporting the Faith","t":"plot","f":"neutral","tr":["Edict","The Seven"],"lim":2,"p":[6,2,1,4]},{"c":"01024","n":"Taxation","t":"plot","f":"neutral","tr":["Edict","Kingdom"],"lim":2,"p":[5,6,1,6]},{"c":"01025","n":"The Winds of Winter","t":"plot","f":"neutral","tr":["Winter"],"lim":2,"p":[3,4,2,5],"v":1},{"c":"01026","n":"Wildfire Assault","t":"plot","f":"neutral","tr":["Scheme","War"],"lim":2,"p":[4,7,1,6]},{"c":"01027","n":"Fealty","t":"agenda","f":"neutral","tr":[],"lim":1},{"c":"01028","n":"Littlefinger","t":"character","f":"neutral","tr":["Ally","Lord","Small Council"],"lim":3,"cost":5,"s":4,"i":"IP","u":1,"m":{"income":1}},{"c":"01029","n":"Varys","t":"character","f":"neutral","tr":["Lord","Small Council","Spy"],"lim":3,"cost":6,"s":3,"i":"I","u":1,"k":{"stealth":1}},{"c":"01030","n":"Rattleshirt's Raiders","t":"character","f":"neutral","tr":["Raider","Wildling"],"lim":3,"cost":4,"s":3,"i":"M","k":{"noAttach":1}},{"c":"01031","n":"Wildling Horde","t":"character","f":"neutral","tr":["Army","Wildling"],"lim":3,"cost":5,"s":5,"i":"MP","k":{"pillage":1,"noAttach":1}},{"c":"01032","n":"Seal of the Hand","t":"attachment","f":"neutral","tr":["Item"],"lim":3,"cost":3,"u":1},{"c":"01033","n":"Bodyguard","t":"attachment","f":"neutral","tr":["Condition"],"lim":3,"cost":1},{"c":"01034","n":"Little Bird","t":"attachment","f":"neutral","tr":["Condition"],"lim":3,"cost":1},{"c":"01035","n":"Milk of the Poppy","t":"attachment","f":"neutral","tr":["Condition"],"lim":3,"cost":1,"k":{"terminal":1}},{"c":"01036","n":"Noble Lineage","t":"attachment","f":"neutral","tr":["Condition"],"lim":3,"cost":0},{"c":"01037","n":"Syrio's Training","t":"attachment","f":"neutral","tr":["Condition","Skill"],"lim":3,"cost":1},{"c":"01038","n":"The Iron Throne","t":"location","f":"neutral","tr":["King's Landing"],"lim":3,"cost":2,"u":1,"m":{"reserve":1}},{"c":"01039","n":"The Kingsroad","t":"location","f":"neutral","tr":["Westeros"],"lim":3,"cost":1,"k":{"limited":1},"m":{"initiative":1}},{"c":"01040","n":"The Roseroad","t":"location","f":"neutral","tr":["Westeros"],"lim":3,"cost":0,"k":{"limited":1},"m":{"income":1},"v":1},{"c":"01041","n":"Put to the Sword","t":"event","f":"neutral","tr":[],"lim":3,"cost":2},{"c":"01042","n":"Put to the Torch","t":"event","f":"neutral","tr":[],"lim":3,"cost":1},{"c":"01043","n":"Superior Claim","t":"event","f":"neutral","tr":[],"lim":3,"cost":0},{"c":"01044","n":"Tears of Lys","t":"event","f":"neutral","tr":["Poison"],"lim":3,"cost":1},{"c":"01045","n":"The Hand's Judgment","t":"event","f":"neutral","tr":[],"lim":3,"cost":"X"},{"c":"01046","n":"Maester Cressen","t":"character","f":"baratheon","tr":["Maester"],"lim":3,"cost":3,"s":3,"i":"P","u":1},{"c":"01047","n":"Melisandre","t":"character","f":"baratheon","tr":["Lady","R'hllor"],"lim":3,"cost":5,"s":4,"i":"IP","u":1},{"c":"01048","n":"Robert Baratheon","t":"character","f":"baratheon","tr":["King","Lord"],"lim":3,"cost":7,"s":5,"i":"MP","u":1,"l":1,"k":{"renown":1,"intimidate":1}},{"c":"01049","n":"Selyse Baratheon","t":"character","f":"baratheon","tr":["House Florent","Lady","R'hllor"],"lim":3,"cost":3,"s":2,"i":"IP","u":1},{"c":"01050","n":"Ser Davos Seaworth","t":"character","f":"baratheon","tr":["Knight","Smuggler"],"lim":3,"cost":4,"s":3,"i":"MP","u":1,"k":{"stealth":1}},{"c":"01051","n":"Shireen Baratheon","t":"character","f":"baratheon","tr":["Lady"],"lim":3,"cost":2,"s":1,"i":"P","u":1},{"c":"01052","n":"Stannis Baratheon","t":"character","f":"baratheon","tr":["Lord","Small Council"],"lim":3,"cost":6,"s":5,"i":"MP","u":1,"l":1},{"c":"01053","n":"Bastard in Hiding","t":"character","f":"baratheon","tr":["Bastard"],"lim":3,"cost":2,"s":2,"i":"MP","v":1},{"c":"01054","n":"Fiery Followers","t":"character","f":"baratheon","tr":["R'hllor"],"lim":3,"cost":3,"s":2,"i":"MI"},{"c":"01055","n":"King's Hunting Party","t":"character","f":"baratheon","tr":["Army"],"lim":3,"cost":4,"s":6,"i":"M","k":{"noAttach":1}},{"c":"01056","n":"Dragonstone Faithful","t":"character","f":"baratheon","tr":["Ally"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01057","n":"Vanguard Lancer","t":"character","f":"baratheon","tr":["House Florent","Knight"],"lim":3,"cost":2,"s":1,"i":"MP"},{"c":"01058","n":"Lightbringer","t":"attachment","f":"baratheon","tr":["R'hllor","Weapon"],"lim":3,"cost":2,"u":1,"l":1},{"c":"01059","n":"Dragonstone Port","t":"location","f":"baratheon","tr":["Dragonstone"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01060","n":"Chamber of the Painted Table","t":"location","f":"baratheon","tr":["Dragonstone"],"lim":3,"cost":2,"u":1},{"c":"01061","n":"The Red Keep","t":"location","f":"baratheon","tr":["King's Landing"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01062","n":"Consolidation of Power","t":"event","f":"baratheon","tr":[],"lim":3,"cost":1,"l":1},{"c":"01063","n":"Ours is the Fury","t":"event","f":"baratheon","tr":[],"lim":3,"cost":2,"l":1},{"c":"01064","n":"Seen In Flames","t":"event","f":"baratheon","tr":["R'hllor"],"lim":3,"cost":1},{"c":"01065","n":"Aeron Damphair","t":"character","f":"greyjoy","tr":["Drowned God","Ironborn","Lord"],"lim":3,"cost":3,"s":3,"i":"P","u":1},{"c":"01066","n":"Alannys Greyjoy","t":"character","f":"greyjoy","tr":["House Harlaw","Lady"],"lim":3,"cost":3,"s":2,"i":"IP","u":1},{"c":"01067","n":"Asha Greyjoy","t":"character","f":"greyjoy","tr":["Ironborn","Lady"],"lim":3,"cost":5,"s":4,"i":"MP","u":1,"k":{"stealth":1}},{"c":"01068","n":"Balon Greyjoy","t":"character","f":"greyjoy","tr":["Ironborn","Lord"],"lim":3,"cost":6,"s":5,"i":"MP","u":1,"l":1,"k":{"renown":1}},{"c":"01069","n":"Euron Crow's Eye","t":"character","f":"greyjoy","tr":["Ironborn","Lord","Raider"],"lim":3,"cost":7,"s":6,"i":"MIP","u":1,"l":1,"k":{"renown":1,"pillage":1}},{"c":"01070","n":"Maester Wendamyr","t":"character","f":"greyjoy","tr":["Maester"],"lim":3,"cost":2,"s":2,"i":"P","u":1,"k":{"stealth":1},"v":1},{"c":"01071","n":"Theon Greyjoy","t":"character","f":"greyjoy","tr":["Ally","Ironborn","Lord"],"lim":3,"cost":4,"s":3,"i":"MP","u":1,"k":{"stealth":1}},{"c":"01072","n":"Black Wind's Crew","t":"character","f":"greyjoy","tr":["Ironborn","Raider"],"lim":3,"cost":3,"s":3,"i":"MP","k":{"pillage":1},"v":1},{"c":"01073","n":"Drowned Men","t":"character","f":"greyjoy","tr":["Army","Drowned God"],"lim":3,"cost":4,"s":3,"i":"MP","k":{"noAttach":1}},{"c":"01074","n":"Iron Islands Fishmonger","t":"character","f":"greyjoy","tr":["Ally","Merchant"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01075","n":"Lordsport Shipwright","t":"character","f":"greyjoy","tr":["Ally","Ironborn"],"lim":3,"cost":2,"s":1,"i":"I"},{"c":"01076","n":"Salty Navigator","t":"character","f":"greyjoy","tr":["Ironborn"],"lim":3,"cost":2,"s":2,"i":"M","m":{"initiative":1},"v":1},{"c":"01077","n":"Throwing Axe","t":"attachment","f":"greyjoy","tr":["Weapon"],"lim":3,"cost":1},{"c":"01078","n":"Great Kraken","t":"location","f":"greyjoy","tr":["Warship"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01079","n":"Iron Fleet Scout","t":"location","f":"greyjoy","tr":["Warship"],"lim":3,"cost":0},{"c":"01080","n":"Sea Tower","t":"location","f":"greyjoy","tr":["Iron Islands"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01081","n":"Risen from the Sea","t":"event","f":"greyjoy","tr":[],"lim":3,"cost":0,"k":{"terminal":1}},{"c":"01082","n":"The Kraken's Grasp","t":"event","f":"greyjoy","tr":[],"lim":3,"cost":0,"l":1},{"c":"01083","n":"We Do Not Sow","t":"event","f":"greyjoy","tr":[],"lim":3,"cost":1,"l":1},{"c":"01084","n":"Cersei Lannister","t":"character","f":"lannister","tr":["Lady","Queen"],"lim":3,"cost":4,"s":4,"i":"IP","u":1,"l":1},{"c":"01085","n":"Grand Maester Pycelle","t":"character","f":"lannister","tr":["Maester","Small Council"],"lim":3,"cost":3,"s":2,"i":"IP","u":1,"l":1,"k":{"insight":1},"v":1},{"c":"01086","n":"Joffrey Baratheon","t":"character","f":"lannister","tr":["Lord"],"lim":3,"cost":3,"s":3,"i":"P","u":1},{"c":"01087","n":"Ser Jaime Lannister","t":"character","f":"lannister","tr":["Knight","Lord"],"lim":3,"cost":6,"s":5,"i":"MI","u":1},{"c":"01088","n":"The Tickler","t":"character","f":"lannister","tr":["Ally"],"lim":3,"cost":2,"s":2,"i":"MI","u":1},{"c":"01089","n":"Tyrion Lannister","t":"character","f":"lannister","tr":["Lord"],"lim":3,"cost":5,"s":4,"i":"IP","u":1,"k":{"stealth":1}},{"c":"01090","n":"Tywin Lannister","t":"character","f":"lannister","tr":["Lord"],"lim":3,"cost":7,"s":6,"i":"MIP","u":1,"l":1,"k":{"renown":1},"m":{"income":2}},{"c":"01091","n":"Burned Men","t":"character","f":"lannister","tr":["Clansman"],"lim":3,"cost":2,"s":2,"i":"M","k":{"ambush":2},"v":1},{"c":"01092","n":"Gold Cloaks","t":"character","f":"lannister","tr":["Ally","Army"],"lim":3,"cost":4,"s":3,"i":"MP","k":{"ambush":2}},{"c":"01093","n":"Lannisport Moneylender","t":"character","f":"lannister","tr":["Merchant"],"lim":3,"cost":2,"s":2,"i":"I","k":{"limited":1},"m":{"income":1},"v":1},{"c":"01094","n":"Lannisport Merchant","t":"character","f":"lannister","tr":["Ally","Steward"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01095","n":"The Queen's Assassin","t":"character","f":"lannister","tr":["Spy"],"lim":3,"cost":2,"s":2,"i":"I","l":1,"k":{"ambush":4}},{"c":"01096","n":"Widow's Wail","t":"attachment","f":"lannister","tr":["Valyrian Steel","Weapon"],"lim":3,"cost":1,"u":1,"k":{"ambush":1}},{"c":"01097","n":"Casterly Rock","t":"location","f":"lannister","tr":["Stronghold","The Westerlands"],"lim":3,"cost":2,"u":1,"l":1},{"c":"01098","n":"Lannisport","t":"location","f":"lannister","tr":["The Westerlands"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01099","n":"Western Fiefdom","t":"location","f":"lannister","tr":["The Westerlands"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01100","n":"Hear Me Roar!","t":"event","f":"lannister","tr":[],"lim":3,"cost":1,"l":1},{"c":"01101","n":"The Things I Do For Love","t":"event","f":"lannister","tr":[],"lim":3,"cost":"X"},{"c":"01102","n":"Treachery","t":"event","f":"lannister","tr":[],"lim":3,"cost":1},{"c":"01103","n":"Areo Hotah","t":"character","f":"martell","tr":["Guard"],"lim":3,"cost":3,"s":5,"i":"M","u":1,"l":1,"k":{"ambush":5}},{"c":"01104","n":"Arianne Martell","t":"character","f":"martell","tr":["Lady"],"lim":3,"cost":5,"s":4,"i":"IP","u":1},{"c":"01105","n":"Doran Martell","t":"character","f":"martell","tr":["Lord"],"lim":3,"cost":6,"s":4,"i":"IP","u":1,"l":1,"k":{"insight":1}},{"c":"01106","n":"Edric Dayne","t":"character","f":"martell","tr":["Brotherhood","House Dayne","Lord"],"lim":3,"cost":2,"s":1,"i":"","u":1,"k":{"stealth":1}},{"c":"01107","n":"Maester Caleotte","t":"character","f":"martell","tr":["Maester"],"lim":3,"cost":3,"s":2,"i":"IP","u":1},{"c":"01108","n":"Obara Sand","t":"character","f":"martell","tr":["Bastard","Sand Snake"],"lim":3,"cost":3,"s":3,"i":"M","u":1},{"c":"01109","n":"The Red Viper","t":"character","f":"martell","tr":["Lord"],"lim":3,"cost":7,"s":7,"i":"MIP","u":1,"l":1},{"c":"01110","n":"Desert Scavenger","t":"character","f":"martell","tr":["Ally"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01111","n":"Dornish Paramour","t":"character","f":"martell","tr":["Companion"],"lim":3,"cost":3,"s":3,"i":"I"},{"c":"01112","n":"Greenblood Trader","t":"character","f":"martell","tr":["Ally"],"lim":3,"cost":2,"s":1,"i":"I","l":1},{"c":"01113","n":"House Dayne Knight","t":"character","f":"martell","tr":["House Dayne","Knight"],"lim":3,"cost":2,"s":2,"i":"MI","v":1},{"c":"01114","n":"Palace Spearman","t":"character","f":"martell","tr":["Guard"],"lim":3,"cost":4,"s":4,"i":"MP","k":{"noAttach":1}},{"c":"01115","n":"Dawn","t":"attachment","f":"martell","tr":["Weapon"],"lim":3,"cost":2,"u":1},{"c":"01116","n":"Ghaston Grey","t":"location","f":"martell","tr":["Dorne"],"lim":3,"cost":2,"u":1,"l":1},{"c":"01117","n":"Sunspear","t":"location","f":"martell","tr":["Dorne"],"lim":3,"cost":2,"u":1},{"c":"01118","n":"Blood Orange Grove","t":"location","f":"martell","tr":["Dorne"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01119","n":"Doran's Game","t":"event","f":"martell","tr":[],"lim":3,"cost":1,"l":1},{"c":"01120","n":"Unbowed, Unbent, Unbroken","t":"event","f":"martell","tr":[],"lim":3,"cost":0},{"c":"01121","n":"Confinement","t":"event","f":"martell","tr":[],"lim":3,"cost":1},{"c":"01122","n":"Benjen Stark","t":"character","f":"thenightswatch","tr":["Ranger"],"lim":3,"cost":5,"s":4,"i":"MP","u":1},{"c":"01123","n":"Ghost","t":"character","f":"thenightswatch","tr":["Direwolf"],"lim":3,"cost":4,"s":3,"i":"M","u":1,"k":{"stealth":1,"noAttach":1}},{"c":"01124","n":"Jon Snow","t":"character","f":"thenightswatch","tr":["Bastard","Steward"],"lim":3,"cost":6,"s":4,"i":"I","u":1},{"c":"01125","n":"Maester Aemon","t":"character","f":"thenightswatch","tr":["Maester","Steward"],"lim":3,"cost":3,"s":2,"i":"I","u":1,"k":{"noAttach":1}},{"c":"01126","n":"Old Bear Mormont","t":"character","f":"thenightswatch","tr":["Commander","Lord"],"lim":3,"cost":7,"s":6,"i":"MP","u":1,"l":1},{"c":"01127","n":"Samwell Tarly","t":"character","f":"thenightswatch","tr":["Steward"],"lim":3,"cost":2,"s":1,"i":"I","u":1,"l":1,"k":{"insight":1},"m":{"reserve":1},"v":1},{"c":"01128","n":"Ser Waymar Royce","t":"character","f":"thenightswatch","tr":["Knight","Ranger"],"lim":3,"cost":3,"s":3,"i":"MP","u":1},{"c":"01129","n":"Yoren","t":"character","f":"thenightswatch","tr":["Wandering Crow"],"lim":3,"cost":3,"s":2,"i":"I","u":1,"l":1},{"c":"01130","n":"Messenger Raven","t":"character","f":"thenightswatch","tr":["Raven"],"lim":3,"cost":1,"s":1,"i":"","l":1,"k":{"noAttach":1}},{"c":"01131","n":"Old Forest Hunter","t":"character","f":"thenightswatch","tr":["Ranger"],"lim":3,"cost":2,"s":1,"i":"M","l":1},{"c":"01132","n":"Ranging Party","t":"character","f":"thenightswatch","tr":["Army","Ranger"],"lim":3,"cost":4,"s":5,"i":"MP"},{"c":"01133","n":"Steward at the Wall","t":"character","f":"thenightswatch","tr":["Ally","Steward"],"lim":3,"cost":1,"s":1,"i":"I"},{"c":"01134","n":"Veteran Builder","t":"character","f":"thenightswatch","tr":["Builder"],"lim":3,"cost":3,"s":4,"i":"P"},{"c":"01135","n":"Longclaw","t":"attachment","f":"thenightswatch","tr":["Valyrian Steel","Weapon"],"lim":3,"cost":2,"u":1},{"c":"01136","n":"Castle Black","t":"location","f":"thenightswatch","tr":["The North"],"lim":3,"cost":2,"u":1},{"c":"01137","n":"The Wall","t":"location","f":"thenightswatch","tr":["Stronghold","The North"],"lim":3,"cost":4,"u":1},{"c":"01138","n":"A Meager Contribution","t":"event","f":"thenightswatch","tr":[],"lim":3,"cost":0,"l":1},{"c":"01139","n":"Take the Black","t":"event","f":"thenightswatch","tr":[],"lim":3,"cost":3,"l":1},{"c":"01140","n":"The Sword in the Darkness","t":"event","f":"thenightswatch","tr":[],"lim":3,"cost":1},{"c":"01141","n":"Arya Stark","t":"character","f":"stark","tr":["Lady"],"lim":3,"cost":3,"s":2,"i":"P","u":1,"k":{"stealth":1}},{"c":"01142","n":"Bran Stark","t":"character","f":"stark","tr":["Lord"],"lim":3,"cost":2,"s":1,"i":"P","u":1},{"c":"01143","n":"Catelyn Stark","t":"character","f":"stark","tr":["House Tully","Lady","The Seven"],"lim":3,"cost":4,"s":4,"i":"IP","u":1,"l":1},{"c":"01144","n":"Eddard Stark","t":"character","f":"stark","tr":["Lord","Small Council"],"lim":3,"cost":7,"s":5,"i":"MP","u":1,"k":{"renown":1}},{"c":"01145","n":"Grey Wind","t":"character","f":"stark","tr":["Direwolf"],"lim":3,"cost":5,"s":4,"i":"M","u":1,"l":1,"k":{"intimidate":1,"noAttach":1}},{"c":"01146","n":"Robb Stark","t":"character","f":"stark","tr":["Lord"],"lim":3,"cost":6,"s":5,"i":"MP","u":1,"l":1,"k":{"renown":1}},{"c":"01147","n":"Sansa Stark","t":"character","f":"stark","tr":["Lady"],"lim":3,"cost":3,"s":2,"i":"IP","u":1},{"c":"01148","n":"Summer","t":"character","f":"stark","tr":["Direwolf"],"lim":3,"cost":3,"s":3,"i":"M","u":1,"l":1,"k":{"noAttach":1}},{"c":"01149","n":"Direwolf Pup","t":"character","f":"stark","tr":["Direwolf"],"lim":3,"cost":2,"s":1,"i":"M","k":{"noAttach":1}},{"c":"01150","n":"Tumblestone Knight","t":"character","f":"stark","tr":["House Tully","Knight"],"lim":3,"cost":2,"s":2,"i":"MP","v":1},{"c":"01151","n":"Vanguard of the North","t":"character","f":"stark","tr":["Army"],"lim":3,"cost":4,"s":4,"i":"M","k":{"noAttach":1}},{"c":"01152","n":"Winterfell Steward","t":"character","f":"stark","tr":["Ally","Steward"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01153","n":"Ice","t":"attachment","f":"stark","tr":["Valyrian Steel","Weapon"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01154","n":"Gates of Winterfell","t":"location","f":"stark","tr":["The North","Winterfell"],"lim":3,"cost":2,"u":1},{"c":"01155","n":"The Wolfswood","t":"location","f":"stark","tr":["The North"],"lim":3,"cost":1,"u":1},{"c":"01156","n":"Heart Tree Grove","t":"location","f":"stark","tr":["Old Gods","Winterfell"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01157","n":"For the North!","t":"event","f":"stark","tr":[],"lim":3,"cost":0},{"c":"01158","n":"Like Warm Rain","t":"event","f":"stark","tr":[],"lim":3,"cost":1},{"c":"01159","n":"Winter Is Coming","t":"event","f":"stark","tr":[],"lim":3,"cost":1,"l":1},{"c":"01160","n":"Daenerys Targaryen","t":"character","f":"targaryen","tr":["Lady","Stormborn"],"lim":3,"cost":7,"s":5,"i":"IP","u":1,"l":1,"k":{"insight":1}},{"c":"01161","n":"Drogon","t":"character","f":"targaryen","tr":["Dragon","Hatchling"],"lim":3,"cost":3,"s":4,"i":"M","u":1,"k":{"noAttach":1}},{"c":"01162","n":"Khal Drogo","t":"character","f":"targaryen","tr":["Dothraki","Lord"],"lim":3,"cost":6,"s":5,"i":"MP","u":1,"l":1,"k":{"renown":1}},{"c":"01163","n":"Magister Illyrio","t":"character","f":"targaryen","tr":["Lord","Merchant"],"lim":3,"cost":5,"s":4,"i":"IP","u":1},{"c":"01164","n":"Rhaegal","t":"character","f":"targaryen","tr":["Dragon","Hatchling"],"lim":3,"cost":3,"s":3,"i":"MI","u":1,"k":{"noAttach":1}},{"c":"01165","n":"Ser Jorah Mormont","t":"character","f":"targaryen","tr":["Companion","Knight"],"lim":3,"cost":2,"s":4,"i":"MI","u":1,"k":{"renown":1}},{"c":"01166","n":"Viserion","t":"character","f":"targaryen","tr":["Dragon","Hatchling"],"lim":3,"cost":2,"s":2,"i":"MP","u":1,"k":{"noAttach":1}},{"c":"01167","n":"Viserys Targaryen","t":"character","f":"targaryen","tr":["Lord"],"lim":3,"cost":1,"s":1,"i":"P","u":1,"l":1},{"c":"01168","n":"Braided Warrior","t":"character","f":"targaryen","tr":["Dothraki"],"lim":3,"cost":2,"s":3,"i":"M"},{"c":"01169","n":"Handmaiden","t":"character","f":"targaryen","tr":["Ally","Companion"],"lim":3,"cost":2,"s":1,"i":"IP"},{"c":"01170","n":"Targaryen Loyalist","t":"character","f":"targaryen","tr":["Ally"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01171","n":"Unsullied","t":"character","f":"targaryen","tr":["Army"],"lim":3,"cost":4,"s":3,"i":"MP"},{"c":"01172","n":"Drogo's Arakh","t":"attachment","f":"targaryen","tr":["Weapon"],"lim":3,"cost":2,"u":1},{"c":"01173","n":"Plaza of Punishment","t":"location","f":"targaryen","tr":["Astapor"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01174","n":"Dothraki Sea","t":"location","f":"targaryen","tr":["Essos"],"lim":3,"cost":1,"u":1},{"c":"01175","n":"Illyrio's Estate","t":"location","f":"targaryen","tr":["Pentos"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01176","n":"Dracarys!","t":"event","f":"targaryen","tr":[],"lim":3,"cost":1,"l":1},{"c":"01177","n":"Fire and Blood","t":"event","f":"targaryen","tr":[],"lim":3,"cost":1,"l":1},{"c":"01178","n":"Waking the Dragon","t":"event","f":"targaryen","tr":[],"lim":3,"cost":0},{"c":"01179","n":"Left","t":"character","f":"tyrell","tr":["Guard"],"lim":3,"cost":2,"s":2,"i":"M","u":1},{"c":"01180","n":"Maester Lomys","t":"character","f":"tyrell","tr":["Maester"],"lim":3,"cost":3,"s":3,"i":"I","u":1},{"c":"01181","n":"Margaery Tyrell","t":"character","f":"tyrell","tr":["Lady"],"lim":3,"cost":3,"s":3,"i":"IP","u":1},{"c":"01182","n":"Paxter Redwyne","t":"character","f":"tyrell","tr":["House Redwyne","Lord"],"lim":3,"cost":4,"s":3,"i":"I","u":1,"l":1,"m":{"income":1}},{"c":"01183","n":"Randyll Tarly","t":"character","f":"tyrell","tr":["House Tarly","Lord"],"lim":3,"cost":6,"s":5,"i":"MP","u":1,"k":{"renown":1}},{"c":"01184","n":"Right","t":"character","f":"tyrell","tr":["Guard"],"lim":3,"cost":2,"s":2,"i":"M","u":1},{"c":"01185","n":"The Knight of Flowers","t":"character","f":"tyrell","tr":["Knight","Lord"],"lim":3,"cost":5,"s":5,"i":"MP","u":1,"k":{"renown":1}},{"c":"01186","n":"The Queen of Thorns","t":"character","f":"tyrell","tr":["Lady"],"lim":3,"cost":7,"s":5,"i":"IP","u":1,"l":1},{"c":"01187","n":"Courtesan of the Rose","t":"character","f":"tyrell","tr":["Companion","Spy"],"lim":3,"cost":2,"s":2,"i":"IP","v":1},{"c":"01188","n":"Garden Caretaker","t":"character","f":"tyrell","tr":["Ally"],"lim":3,"cost":1,"s":1,"i":"P"},{"c":"01189","n":"Olenna's Informant","t":"character","f":"tyrell","tr":["Ally","Spy"],"lim":3,"cost":3,"s":2,"i":"IP","k":{"ambush":4}},{"c":"01190","n":"Wardens of the Reach","t":"character","f":"tyrell","tr":["Army"],"lim":3,"cost":4,"s":3,"i":"MP","k":{"noAttach":1}},{"c":"01191","n":"Heartsbane","t":"attachment","f":"tyrell","tr":["Valyrian Steel","Weapon"],"lim":3,"cost":1,"u":1},{"c":"01192","n":"Highgarden","t":"location","f":"tyrell","tr":["Stronghold","The Reach"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01193","n":"The Mander","t":"location","f":"tyrell","tr":["The Reach"],"lim":3,"cost":3,"u":1,"l":1},{"c":"01194","n":"Rose Garden","t":"location","f":"tyrell","tr":["The Reach"],"lim":3,"cost":0,"k":{"limited":1}},{"c":"01195","n":"Growing Strong","t":"event","f":"tyrell","tr":[],"lim":3,"cost":1},{"c":"01196","n":"Olenna's Cunning","t":"event","f":"tyrell","tr":[],"lim":3,"cost":2,"l":1},{"c":"01197","n":"\"The Bear and the Maiden Fair\"","t":"event","f":"tyrell","tr":["Song"],"lim":3,"cost":0},{"c":"01198","n":"Banner of the Stag","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01199","n":"Banner of the Kraken","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01200","n":"Banner of the Lion","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01201","n":"Banner of the Sun","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01202","n":"Banner of the Watch","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01203","n":"Banner of the Wolf","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01204","n":"Banner of the Dragon","t":"agenda","f":"neutral","tr":["Banner"],"lim":1},{"c":"01205","n":"Banner of the Rose","t":"agenda","f":"neutral","tr":["Banner"],"lim":1}];
+
+// ================= MOTOR DE JOGO — AGoT 2ª edição (protótipo) =================
+const DB = {}; CARDS.forEach(d => DB[d.c] = d);
+const NAME_IDX = {}; CARDS.forEach(d => { NAME_IDX[d.n.toLowerCase()] = d.c; });
+// ---------- idioma (PT / EN) ----------
+let LANG = (() => { try { return localStorage.getItem('agot_lang') || 'pt'; } catch (e) { return 'pt'; } })();
+function LX(pt, en) { return LANG === 'en' ? en : pt; }
+function i18nObj(pt, en) { const src = () => LANG === 'en' ? en : pt; return new Proxy({}, { get: (_, k) => src()[k], ownKeys: () => Reflect.ownKeys(pt), getOwnPropertyDescriptor: (_, k) => ({ enumerable: true, configurable: true, value: src()[k] }), has: (_, k) => k in pt }); }
+const FACTION_NAMES = i18nObj({ baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutra' },
+  { baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutral' });
+const CH_NAMES = i18nObj({ military: 'Militar', intrigue: 'Intriga', power: 'Poder' }, { military: 'Military', intrigue: 'Intrigue', power: 'Power' });
+const ICON_OF = { military: 'M', intrigue: 'I', power: 'P' };
+const CH_TYPES = ['military', 'intrigue', 'power'];
+const PHASE_NAMES = { setup: 'Setup', plot: 'Plot', draw: 'Draw', marshal: 'Marshaling', challenges: 'Challenges', dominance: 'Dominance', standing: 'Standing', taxation: 'Taxation' };
+const WIN_POWER = 15;
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+class GameOver extends Error { constructor(w, why) { super('fim'); this.winner = w; this.why = why; } }
+
+let UID = 1;
+function mkCard(code, owner) {
+  return { uid: UID++, code, d: DB[code], owner, kneel: false, power: 0, att: [], dupes: [], tmp: 0, ph: 0, zone: 'deck', parent: null, flags: {}, tmpIcons: '', tmpKw: {} };
+}
+const AB = {}; // habilidades por código (abilities.js)
+function ab(c) { return AB[c.code] || {}; }
+function isAuto(code) { const d = DB[code]; return !!(d && (d.v || AB[code])); }
+
+class Game {
+  constructor(decks, ctrls, names) {
+    this.players = [0, 1].map(i => {
+      const dk = decks[i];
+      const p = { i, name: names[i], ctrl: ctrls[i], faction: dk.faction, agenda: dk.agenda || null, deck: [], hand: [], plots: [], used: [], plot: null,
+        chars: [], locs: [], discard: [], dead: [], removed: [], power: 0, gold: 0, fknelt: false, reducers: [], limitedUsed: 0, flags: {}, won: {}, chDone: {} };
+      for (const [code, n] of Object.entries(dk.cards)) {
+        const d = DB[code]; if (!d || d.t === 'agenda' || d.t === 'title') continue;
+        for (let k = 0; k < n; k++) {
+          const c = mkCard(code, p);
+          if (d.t === 'plot') { c.zone = 'plots'; p.plots.push(c); } else p.deck.push(c);
+        }
+      }
+      shuffle(p.deck); p.deck.forEach(c => c.zone = 'deck');
+      return p;
+    });
+    this.players.forEach((p, i) => p.opp = this.players[1 - i]);
+    this.logs = []; this.phase = 'setup'; this.round = 0; this.first = this.players[0]; this.ch = null; this.winner = null; this.onUpdate = null; this.aiDelay = 0;
+    this.endOfPhase = []; // callbacks
+  }
+  // ---------- util ----------
+  log(msg, cls) { this.logs.push({ msg, cls: cls || '' }); if (this.logs.length > 400) this.logs.shift(); this.emit(); }
+  emit() { if (this.onUpdate) this.onUpdate(); }
+  order() { return [this.first, this.first.opp]; }
+  pname(p) { return p.name; }
+  cn(c) { return c.d.n; }
+  // ---------- consultas ----------
+  attsOf(p) { const r = []; for (const q of this.players) for (const c of q.chars) for (const a of c.att) if (a.owner === p) r.push(a); return r; }
+  inPlay(p) { return [...p.chars, ...p.locs, ...this.attsOf(p)]; }
+  allChars() { return [...this.players[0].chars, ...this.players[1].chars]; }
+  allInPlay() { return [...this.inPlay(this.players[0]), ...this.inPlay(this.players[1])]; }
+  controller(c) { return c.owner; }
+  anyPlot(code) { return this.players.some(p => p.plot && p.plot.code === code); }
+  myPlot(p, code) { return p.plot && p.plot.code === code; }
+  anyPlotTrait(t) { return this.players.some(p => p.plot && p.plot.d.tr.includes(t)); }
+  blank(c) {
+    if (c.d.t === 'character') {
+      if (this.anyPlot('01012')) return true;
+      if (c.att.some(a => a.code === '01035')) return true;
+    }
+    return false;
+  }
+  hasTrait(c, t) { return c.d.tr.includes(t); }
+  str(c) {
+    if (c.d.t !== 'character') return 0;
+    let s = (c.d.s || 0) + c.tmp + c.ph;
+    if (!this.blank(c) && ab(c).str) s += ab(c).str(this, c);
+    for (const a of c.att) if (ab(a).attStr) s += ab(a).attStr(this, a, c);
+    return Math.max(0, s);
+  }
+  hasIcon(c, type) {
+    const L = ICON_OF[type];
+    if ((c.d.i || '').includes(L) || c.tmpIcons.includes(L)) return true;
+    if (!this.blank(c) && ab(c).icons && ab(c).icons(this, c).includes(L)) return true;
+    for (const a of c.att) if (ab(a).attIcons && ab(a).attIcons(this, a, c).includes(L)) return true;
+    return false;
+  }
+  hasKw(c, k) {
+    if (c.tmpKw[k]) return true;
+    if (!this.blank(c) && c.d.k && c.d.k[k]) return true;
+    if (!this.blank(c) && ab(c).kw && ab(c).kw(this, c)[k]) return true;
+    for (const a of c.att) if (ab(a).attKw && ab(a).attKw(this, a, c)[k]) return true;
+    if (c.d.t === 'character' && c.zone === 'chars') for (const o of this.inPlay(c.owner)) if (o !== c && !this.blank(o) && ab(o).grantKw) { const g = ab(o).grantKw(this, o, c); if (g && g[k]) return true; }
+    return false;
+  }
+  mod(p, key) { // income / initiative / reserve
+    let v = 0;
+    for (const c of this.inPlay(p)) { if (this.blank(c)) continue; if (c.d.m && c.d.m[key]) v += c.d.m[key]; }
+    return v;
+  }
+  income(p) {
+    if (!p.plot) return 0;
+    let base = p.plot.d.p[0];
+    if (this.anyPlot('01017') && (p.plot.d.tr.includes('Kingdom') || p.plot.d.tr.includes('Edict'))) base = 0;
+    return Math.max(0, base + this.mod(p, 'income'));
+  }
+  initiative(p) { return (p.plot ? p.plot.d.p[1] : 0) + this.mod(p, 'initiative'); }
+  reserve(p) { return (p.plot ? p.plot.d.p[3] : 7) + this.mod(p, 'reserve'); }
+  totalPower(p) { let t = p.power; for (const c of [...p.chars, ...p.locs]) t += c.power; return t; }
+  canTrigger(p) { // Catelyn Stark
+    const ch = this.ch; if (!ch) return true;
+    const opp = p.opp;
+    const parts = [...ch.attackers, ...ch.defenders];
+    return !parts.some(c => c.owner === opp && c.code === '01143' && !this.blank(c) && c.zone === 'chars');
+  }
+  limitMax(p) { return 1 + (this.myPlot(p, '01024') ? 1 : 0); }
+  // ---------- verificações ----------
+  checkWin() {
+    for (const p of this.order()) if (this.totalPower(p) >= WIN_POWER) { this.winner = p; throw new GameOver(p, LX(`${p.name} chegou a ${WIN_POWER} de poder!`, `${p.name} reached ${WIN_POWER} power!`)); }
+  }
+  checkDecks() {
+    for (const p of this.players) if (p.deck.length === 0) { this.winner = p.opp; throw new GameOver(p.opp, LX(`${p.name} ficou sem cartas no baralho e foi eliminado.`, `${p.name} ran out of cards in their deck and is eliminated.`)); }
+  }
+  // ---------- movimento ----------
+  removeFromZone(c) {
+    const p = c.owner; const z = c.zone;
+    const rm = arr => { const i = arr.indexOf(c); if (i >= 0) arr.splice(i, 1); };
+    if (z === 'hand') rm(p.hand); else if (z === 'deck') rm(p.deck); else if (z === 'discard') rm(p.discard); else if (z === 'dead') rm(p.dead);
+    else if (z === 'chars') rm(p.chars); else if (z === 'locs') rm(p.locs); else if (z === 'plots') rm(p.plots); else if (z === 'used') rm(p.used);
+    else if (z === 'att' && c.parent) { rm(c.parent.att); c.parent = null; } else if (z === 'dupe' && c.parent) { rm(c.parent.dupes); c.parent = null; }
+    if (this.ch) { rm(this.ch.attackers); rm(this.ch.defenders); }
+    c.zone = null;
+  }
+  toZone(c, z) {
+    const p = c.owner; c.zone = z;
+    if (z === 'hand') p.hand.push(c); else if (z === 'deck') p.deck.unshift(c); else if (z === 'discard') p.discard.push(c); else if (z === 'dead') p.dead.push(c); else if (z === 'removed') p.removed.push(c);
+  }
+  resetCard(c) { c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.tmpKw = {}; }
+  // carta sai de jogo: anexos e duplicados vão para o descarte do dono
+  leavePlay(c, dest) {
+    for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); this.toZone(a, 'discard'); }
+    for (const d of [...c.dupes]) { this.removeFromZone(d); this.resetCard(d); this.toZone(d, 'discard'); }
+    this.removeFromZone(c); this.resetCard(c); this.toZone(c, dest);
+  }
+  async trySave(c) {
+    if (c.dupes.length) { const d = c.dupes[0]; this.removeFromZone(d); this.toZone(d, 'discard'); this.log(LX(`${this.cn(c)} é salvo ao descartar um duplicado.`, `${this.cn(c)} is saved by discarding a duplicate.`)); return true; }
+    const bg = c.att.find(a => a.code === '01033');
+    if (bg && this.canTrigger(bg.owner)) { this.removeFromZone(bg); this.resetCard(bg); this.toZone(bg, 'discard'); this.log(LX(`${bg.owner.name} sacrifica Bodyguard para salvar ${this.cn(c)}.`, `${bg.owner.name} sacrifices Bodyguard to save ${this.cn(c)}.`)); return true; }
+    return false;
+  }
+  async kill(c, opts = {}) {
+    if (c.zone !== 'chars') return false;
+    if (opts.save !== false && await this.trySave(c)) return false;
+    const p = c.owner;
+    this.leavePlay(c, 'dead');
+    this.log(LX(`☠ ${this.cn(c)} (${p.name}) foi morto.`, `☠ ${this.cn(c)} (${p.name}) is killed.`), 'kill');
+    await this.afterLeave(c, 'killed');
+    return true;
+  }
+  async discardFromPlay(c, opts = {}) {
+    if (!['chars', 'locs', 'att'].includes(c.zone)) return false;
+    if (c.zone === 'chars' && opts.save !== false && await this.trySave(c)) return false;
+    this.leavePlay(c, 'discard');
+    this.log(LX(`${this.cn(c)} (${c.owner.name}) foi descartado de jogo.`, `${this.cn(c)} (${c.owner.name}) is discarded from play.`));
+    return true;
+  }
+  async sacrifice(c) {
+    const wasChar = c.zone === 'chars';
+    this.leavePlay(c, 'discard');
+    this.log(LX(`${c.owner.name} sacrifica ${this.cn(c)}.`, `${c.owner.name} sacrifices ${this.cn(c)}.`));
+    if (wasChar) await this.afterLeave(c, 'sacrificed');
+  }
+  async afterLeave(c, how) {
+    for (const o of this.allInPlay()) if (!this.blank(o) && ab(o).afterCharLeaves && this.canTrigger(o.owner)) await ab(o).afterCharLeaves(this, o, c, how);
+  }
+  returnToHand(c) { this.leavePlay(c, 'hand'); this.log(LX(`${this.cn(c)} volta para a mão de ${c.owner.name}.`, `${this.cn(c)} returns to ${c.owner.name}'s hand.`)); }
+  draw(p, n, quiet) {
+    let k = 0;
+    for (let i = 0; i < n && p.deck.length; i++) { const c = p.deck.shift(); c.zone = 'hand'; p.hand.push(c); k++; }
+    if (!quiet && k) this.log(LX(`${p.name} compra ${k} carta${k > 1 ? 's' : ''}.`, `${p.name} draws ${k} card${k > 1 ? 's' : ''}.`));
+    return k;
+  }
+  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } return c; }
+  discardFromHand(p, c) { this.removeFromZone(c); this.toZone(c, 'discard'); }
+  gainPower(p, n, card) {
+    if (n <= 0) return;
+    if (card) { card.power += n; this.log(LX(`${this.cn(card)} ganha ${n} de poder.`, `${this.cn(card)} gains ${n} power.`), 'pow'); }
+    else { p.power += n; this.log(LX(`${p.name} ganha ${n} de poder para a facção.`, `${p.name} gains ${n} power for their faction.`), 'pow'); }
+    this.checkWin();
+  }
+  movePower(from, to, n) {
+    const k = Math.min(n, from.power); if (k <= 0) return 0;
+    from.power -= k; to.power += k; this.log(LX(`${k} de poder passa de ${from.name} para ${to.name}.`, `${k} power moves from ${from.name} to ${to.name}.`), 'pow'); this.checkWin(); return k;
+  }
+  // ---------- entrada em jogo ----------
+  findDupeTarget(p, c) { if (!c.d.u) return null; return [...p.chars, ...p.locs, ...this.attsOf(p)].find(o => o.d.n === c.d.n) || null; }
+  uniqueBlockedByDead(p, c) { return c.d.u && p.dead.some(o => o.d.n === c.d.n); }
+  attachTargets(p, a) {
+    const f = ab(a).attachOk;
+    return this.allChars().filter(t => !t.d.k?.noAttach && (!f || f(this, a, t, p)));
+  }
+  async putIntoPlay(p, c, how, opts = {}) {
+    // how: 'setup' | 'marshal' | 'put' | 'ambush'
+    const dupT = this.findDupeTarget(p, c);
+    this.removeFromZone(c);
+    if (dupT) { c.zone = 'dupe'; c.parent = dupT; dupT.dupes.push(c); this.log(LX(`${p.name} coloca ${this.cn(c)} como duplicado.`, `${p.name} places ${this.cn(c)} as a duplicate.`)); this.emit(); return c; }
+    this.resetCard(c);
+    if (c.d.t === 'character') {
+      c.zone = 'chars'; p.chars.push(c);
+      if (ab(c).entersKnelt && !this.blank(c)) c.kneel = true;
+    } else if (c.d.t === 'location') { c.zone = 'locs'; p.locs.push(c); }
+    else if (c.d.t === 'attachment') {
+      let target = opts.target;
+      if (!target) {
+        const t = this.attachTargets(p, c);
+        if (!t.length) { this.toZone(c, 'discard'); this.log(LX(`${this.cn(c)} não tem alvo válido e é descartado.`, `${this.cn(c)} has no valid target and is discarded.`)); return null; }
+        [target] = await p.ctrl.chooseCards(this, p, { prompt: LX(`Escolhe a personagem onde anexar ${this.cn(c)}`, `Choose a character to attach ${this.cn(c)} to`), cands: t, min: 1, max: 1, ai: x => AI.attachScore(this, p, c, x) });
+      }
+      c.zone = 'att'; c.parent = target; target.att.push(c);
+    }
+    if (opts.kneel) c.kneel = true;
+    const verb = { setup: LX('coloca em setup', 'sets up'), marshal: LX('faz marshal de', 'marshals'), put: LX('põe em jogo', 'puts into play'), ambush: LX('faz ambush de', 'ambushes') }[how];
+    this.log(LX(`${p.name} ${verb} ${this.cn(c)}${c.parent ? ' em ' + this.cn(c.parent) : ''}.`, `${p.name} ${verb} ${this.cn(c)}${c.parent ? ' on ' + this.cn(c.parent) : ''}.`));
+    if (how !== 'setup') {
+      if (!this.blank(c) && ab(c).onEnter && this.canTrigger(p)) await ab(c).onEnter(this, c, how);
+    }
+    this.emit();
+    return c;
+  }
+  // ---------- custos ----------
+  reducerTotal(p, c, mode) {
+    let red = 0;
+    for (const r of p.reducers) if (r.modes.includes(mode) && r.f(c)) red += r.amt;
+    if (mode === 'marshal' && this.myPlot(p, '01004') && !p.flags.nobleUsed && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) red += 2;
+    return red;
+  }
+  costOf(p, c, mode) {
+    if (mode === 'marshal' && this.findDupeTarget(p, c)) return 0;
+    const base = c.d.cost === 'X' ? 0 : (c.d.cost || 0);
+    return Math.max(0, base - this.reducerTotal(p, c, mode));
+  }
+  consumeReducers(p, c, mode) {
+    p.reducers = p.reducers.filter(r => !(r.modes.includes(mode) && r.f(c)));
+    if (mode === 'marshal' && this.myPlot(p, '01004') && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) p.flags.nobleUsed = true;
+  }
+  canMarshal(p, c) {
+    if (c.zone !== 'hand' || !['character', 'location', 'attachment'].includes(c.d.t)) return false;
+    if (this.myPlot(p, '01016') && c.d.t !== 'character') return false;
+    if (this.uniqueBlockedByDead(p, c)) return false;
+    const dup = this.findDupeTarget(p, c);
+    if (c.d.k?.limited && p.limitedUsed >= this.limitMax(p)) return false;
+    if (!dup && c.d.t === 'attachment' && !this.attachTargets(p, c).length) return false;
+    return this.costOf(p, c, 'marshal') <= p.gold;
+  }
+  async marshal(p, c) {
+    const cost = this.costOf(p, c, 'marshal');
+    this.consumeReducers(p, c, 'marshal');
+    p.gold -= cost;
+    if (c.d.k?.limited) p.limitedUsed++;
+    if (cost) this.log(LX(`(${p.name} paga ${cost} ouro)`, `(${p.name} pays ${cost} gold)`), 'dim');
+    await this.putIntoPlay(p, c, 'marshal');
+  }
+  ambushCost(p, c) {
+    if (c.zone !== 'hand') return null;
+    let x = c.d.k?.ambush;
+    if (x == null && c.d.t === 'character' && this.hasTrait(c, 'Direwolf') && p.locs.some(l => l.code === '01155')) x = c.d.cost;
+    return x == null ? null : x;
+  }
+  canAmbush(p, c) {
+    const x = this.ambushCost(p, c); if (x == null) return false;
+    if (this.uniqueBlockedByDead(p, c)) return false;
+    if (c.d.k?.limited && p.limitedUsed >= this.limitMax(p)) return false;
+    if (c.d.t === 'attachment' && !this.findDupeTarget(p, c) && !this.attachTargets(p, c).length) return false;
+    return x <= p.gold;
+  }
+  async ambush(p, c) {
+    const x = this.ambushCost(p, c); p.gold -= x; if (c.d.k?.limited) p.limitedUsed++;
+    const r = await this.putIntoPlay(p, c, 'ambush');
+    if (r && r.zone === 'chars') r.flags.ambushed = this.phase;
+  }
+  // ---------- eventos ----------
+  canPlayEvent(p, c, timing, ctx) {
+    if (c.zone !== 'hand' || c.d.t !== 'event') return false;
+    const e = ab(c).ev; if (!e || e.timing !== timing) return false;
+    if (this.myPlot(p, '01016')) return false;
+    if (!this.canTrigger(p)) return false;
+    if (c.d.k?.limited && p.limitedUsed >= this.limitMax(p)) return false;
+    const cost = e.cost ? e.cost(this, p, ctx) : this.costOf(p, c, 'play');
+    if (cost > p.gold) return false;
+    return !e.cond || e.cond(this, p, ctx);
+  }
+  async playEvent(p, c, ctx) {
+    const e = ab(c).ev;
+    const cost = e.cost ? e.cost(this, p, ctx) : this.costOf(p, c, 'play');
+    this.consumeReducers(p, c, 'play');
+    p.gold -= cost; if (c.d.k?.limited) p.limitedUsed++;
+    this.removeFromZone(c); c.zone = 'limbo';
+    this.log(LX(`${p.name} joga o evento ${this.cn(c)}.`, `${p.name} plays the event ${this.cn(c)}.`), 'ev');
+    const cancelled = await this.offerCancel(p.opp, c, cost);
+    if (!cancelled) await e.run(this, p, c, ctx);
+    this.toZone(c, 'discard'); this.emit();
+  }
+  async offerCancel(q, evCard, evCost) {
+    if (!this.canTrigger(q)) return false;
+    const opts = [];
+    const bran = q.chars.find(x => x.code === '01142' && !this.blank(x));
+    if (bran) opts.push({ label: LX('Sacrificar Bran Stark para cancelar', 'Sacrifice Bran Stark to cancel'), value: 'bran' });
+    const hj = q.hand.find(x => x.code === '01045');
+    if (hj && q.gold >= (evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0) && !this.myPlot(q, '01016')) opts.push({ label: LX(`Jogar The Hand's Judgment (${evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0} ouro)`, `Play The Hand's Judgment (${evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0} gold)`), value: 'hj' });
+    if (!opts.length) return false;
+    opts.push({ label: LX('Não cancelar', "Don't cancel"), value: null });
+    const v = await q.ctrl.chooseOption(this, q, { prompt: LX(`${evCard.owner.name} jogou ${this.cn(evCard)}. Cancelar?`, `${evCard.owner.name} played ${this.cn(evCard)}. Cancel it?`), options: opts, ai: o => o.value ? AI.cancelScore(this, q, evCard) : 0, card: evCard });
+    if (v === 'bran') { await this.sacrifice(bran); this.log(LX(`Efeito de ${this.cn(evCard)} cancelado.`, `${this.cn(evCard)}'s effects are cancelled.`)); return true; }
+    if (v === 'hj') { const x = evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0; q.gold -= x; this.removeFromZone(hj); this.toZone(hj, 'discard'); this.log(LX(`${q.name} joga The Hand's Judgment: ${this.cn(evCard)} é cancelado.`, `${q.name} plays The Hand's Judgment: ${this.cn(evCard)} is cancelled.`), 'ev'); return true; }
+    return false;
+  }
+  // ---------- ações disponíveis ----------
+  availableActions(p, ctx) {
+    // ctx: {phase, ch}
+    const acts = [];
+    if (!this.canTrigger(p)) return acts;
+    for (const c of this.inPlay(p)) {
+      if (this.blank(c) || !ab(c).actions) continue;
+      for (const a of ab(c).actions(this, c, ctx) || []) acts.push({ card: c, ...a });
+    }
+    if (p.plot && ab(p.plot).actions) for (const a of ab(p.plot).actions(this, p.plot, ctx) || []) acts.push({ card: p.plot, ...a });
+    if (p.agenda && AB[p.agenda] && AB[p.agenda].factionActions) for (const a of AB[p.agenda].factionActions(this, p, ctx) || []) acts.push({ card: null, faction: true, ...a });
+    for (const c of p.hand) if (this.canPlayEvent(p, c, 'action', ctx)) acts.push({ card: c, label: LX(`Jogar ${this.cn(c)}`, `Play ${this.cn(c)}`), ai: ab(c).ev.ai ? ab(c).ev.ai(this, p, ctx) : 1, run: () => this.playEvent(p, c, ctx) });
+    if (ctx.phase === 'challenges') for (const c of p.hand) if (this.canAmbush(p, c)) acts.push({ card: c, label: LX(`Ambush (${this.ambushCost(p, c)} ouro)`, `Ambush (${this.ambushCost(p, c)} gold)`), ai: AI.ambushScore(this, p, c, ctx), run: () => this.ambush(p, c) });
+    return acts;
+  }
+  async actionRound(ctx, starter, prompt) {
+    // janela de ações: alterna entre jogadores até ambos passarem
+    let passes = 0, cur = starter || this.first;
+    let guard = 0;
+    while (passes < 2 && guard++ < 40) {
+      const acts = this.availableActions(cur, ctx);
+      let chosen = null;
+      if (acts.length) chosen = await cur.ctrl.actionWindow(this, cur, { prompt: prompt || LX('Janela de ações', 'Action window'), actions: acts, passLabel: LX('Passar', 'Pass'), ctx });
+      if (chosen && chosen.run) { await chosen.run(); passes = 0; this.emit(); }
+      else passes++;
+      cur = cur.opp;
+    }
+  }
+  // ---------- reações genéricas ----------
+  async fire(hook, ...args) {
+    for (const p of this.order()) {
+      for (const c of [...this.inPlay(p), ...(p.plot ? [p.plot] : [])]) {
+        if (c.zone && !['chars', 'locs', 'att', 'plot'].includes(c.zone)) continue;
+        if (c.d.t !== 'plot' && this.blank(c)) continue;
+        const h = ab(c)[hook];
+        if (h && this.canTrigger(p)) await h(this, c, ...args);
+      }
+    }
+  }
+  // ================= FLUXO =================
+  async run() {
+    try {
+      await this.setup();
+      while (true) { await this.playRound(); }
+    } catch (e) {
+      if (e instanceof GameOver) { this.winner = e.winner; this.log(LX(`🏆 ${e.why} ${e.winner.name} vence!`, `🏆 ${e.why} ${e.winner.name} wins!`), 'win'); this.phase = 'end'; this.emit(); return e.winner; }
+      throw e;
+    }
+  }
+  async setup() {
+    this.phase = 'setup'; this.log('— Setup —', 'phase');
+    for (const p of this.players) this.draw(p, 7, true);
+    for (const p of this.players) {
+      // escolher cartas de setup (até 8 ouro, 1 limitada, sem eventos)
+      let budget = 8; let limited = 0;
+      while (true) {
+        const cands = p.hand.filter(c => {
+          if (!['character', 'location', 'attachment'].includes(c.d.t)) return false;
+          const dup = this.findDupeTarget(p, c);
+          const cost = dup ? 0 : (c.d.cost || 0);
+          if (cost > budget) return false;
+          if (c.d.k?.limited && limited >= 1) return false;
+          if (!dup && c.d.t === 'attachment' && !this.attachTargets(p, c).length) return false;
+          return true;
+        });
+        if (!cands.length) break;
+        const [c] = await p.ctrl.chooseCards(this, p, { prompt: LX(`Setup: escolhe cartas para colocar (ouro restante: ${budget}). Concluir quando terminares.`, `Setup: choose cards to place (gold left: ${budget}). Click Done when finished.`), cands, min: 0, max: 1, ai: x => AI.setupScore(this, p, x, budget), doneLabel: LX('Concluir setup', 'Done with setup') });
+        if (!c) break;
+        const dup = this.findDupeTarget(p, c);
+        budget -= dup ? 0 : (c.d.cost || 0); if (c.d.k?.limited) limited++;
+        await this.putIntoPlay(p, c, 'setup');
+      }
+    }
+    for (const p of this.players) { const n = 7 - p.hand.length; if (n > 0) this.draw(p, n); }
+    this.checkDecks();
+  }
+  async playRound() {
+    this.round++;
+    for (const p of this.players) { p.limitedUsed = 0; p.flags = {}; for (const c of this.inPlay(p)) c.flags = Object.assign({}, c.flags.ambushed ? { ambushed: c.flags.ambushed } : {}); }
+    await this.plotPhase();
+    await this.drawPhase();
+    await this.marshalPhase();
+    await this.challengesPhase();
+    await this.dominancePhase();
+    await this.standingPhase();
+    await this.taxationPhase();
+  }
+  async endPhase() {
+    const cbs = this.endOfPhase; this.endOfPhase = [];
+    for (const f of cbs) await f();
+    await this.fire('onPhaseEnd', this.phase);
+    for (const p of this.players) { p.reducers = []; for (const c of p.chars) { c.ph = 0; } }
+    this.emit();
+  }
+  async plotPhase() {
+    this.phase = 'plot'; this.log(LX(`— Ronda ${this.round}: Plot —`, `— Round ${this.round}: Plot —`), 'phase');
+    const chosen = [];
+    for (const p of this.players) {
+      if (!p.plots.length) { p.plots.push(...p.used); p.used.forEach(c => c.zone = 'plots'); p.used = []; }
+      const [pl] = await p.ctrl.chooseCards(this, p, { prompt: LX('Escolhe o plot desta ronda', 'Choose your plot for this round'), cands: p.plots, min: 1, max: 1, ai: x => AI.plotScore(this, p, x), modal: true });
+      chosen.push(pl);
+    }
+    this.players.forEach((p, i) => {
+      if (p.plot) { p.plot.zone = 'used'; p.used.push(p.plot); }
+      const pl = chosen[i]; this.removeFromZone(pl); pl.zone = 'plot'; pl.flags = {}; p.plot = pl;
+      this.log(LX(`${p.name} revela ${this.cn(pl)}.`, `${p.name} reveals ${this.cn(pl)}.`));
+    });
+    // iniciativa
+    const [a, b] = this.players; const ia = this.initiative(a), ib = this.initiative(b);
+    let w;
+    if (ia !== ib) w = ia > ib ? a : b;
+    else { const pa = this.totalPower(a), pb = this.totalPower(b); w = pa !== pb ? (pa < pb ? a : b) : this.players[Math.floor(Math.random() * 2)]; }
+    this.log(LX(`Iniciativa: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} ganha a iniciativa.`, `Initiative: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} wins initiative.`));
+    const firstChoice = await w.ctrl.chooseOption(this, w, { prompt: LX('Ganhaste a iniciativa. Quem é o primeiro jogador?', 'You won initiative. Who will be first player?'), options: [{ label: LX('Eu', 'Me'), value: w }, { label: w.opp.name, value: w.opp }], ai: o => o.value === w ? 1 : 0 });
+    this.first = firstChoice; this.log(LX(`${this.first.name} é o primeiro jogador.`, `${this.first.name} is first player.`));
+    this.emit();
+    // when revealed
+    for (const p of this.order()) {
+      const h = ab(p.plot).reveal;
+      if (h) await h(this, p, p.plot);
+    }
+    await this.endPhase();
+  }
+  async drawPhase() {
+    this.phase = 'draw'; this.log('— Draw —', 'phase');
+    for (const p of this.order()) this.draw(p, 2);
+    this.checkDecks();
+    await this.endPhase();
+  }
+  async marshalPhase() {
+    this.phase = 'marshal'; this.log('— Marshaling —', 'phase');
+    for (const p of this.order()) {
+      const inc = this.income(p); p.gold += inc; this.log(LX(`${p.name} recolhe ${inc} ouro (total ${p.gold}).`, `${p.name} collects ${inc} gold (total ${p.gold}).`), 'gold');
+      this.activeP = p;
+      let guard = 0;
+      while (guard++ < 60) {
+        const ctx = { phase: 'marshal', active: p };
+        const acts = this.availableActions(p, ctx);
+        for (const c of p.hand) if (this.canMarshal(p, c)) {
+          const dup = this.findDupeTarget(p, c);
+          acts.push({ card: c, label: dup ? LX('Marshal como duplicado (0)', 'Marshal as duplicate (0)') : LX(`Marshal (${this.costOf(p, c, 'marshal')} ouro)`, `Marshal (${this.costOf(p, c, 'marshal')} gold)`), marshal: true, ai: AI.marshalScore(this, p, c), run: () => this.marshal(p, c) });
+        }
+        const ch = await p.ctrl.actionWindow(this, p, { prompt: LX(`Marshaling — ouro: ${p.gold}. Escolhe cartas para jogar ou termina.`, `Marshaling — gold: ${p.gold}. Choose cards to play, or finish.`), actions: acts, passLabel: LX('Terminar marshaling', 'Done marshaling'), ctx });
+        if (!ch) break;
+        await ch.run(); this.emit();
+      }
+    }
+    this.activeP = null;
+    await this.endPhase();
+  }
+  // ---------- desafios ----------
+  maxOfType(p, t) {
+    let n = 1;
+    if (t === 'military' && this.myPlot(p, '01005')) n++;
+    if (t === 'intrigue' && p.locs.some(l => l.code === '01097' && !this.blank(l))) n++;
+    return n;
+  }
+  canAttackWith(p, c, t) { return c.zone === 'chars' && !c.kneel && this.hasIcon(c, t); }
+  challengeAllowed(p, t) {
+    if ((p.chDone[t] || 0) >= this.maxOfType(p, t)) return false;
+    const total = CH_TYPES.reduce((s, x) => s + (p.chDone[x] || 0), 0);
+    if (this.myPlot(p, '01021') && total >= 1) return false;
+    if (this.anyPlot('01003') && t !== 'intrigue' && !p.won.intrigue) return false;
+    return p.chars.some(c => this.canAttackWith(p, c, t));
+  }
+  async challengesPhase() {
+    this.phase = 'challenges'; this.log('— Challenges —', 'phase');
+    if (this.anyPlot('01023')) { for (const p of this.players) p.gold = 0; this.log(LX('Supporting the Faith: todo o ouro volta ao tesouro.', 'Supporting the Faith: all gold returns to the treasury.')); }
+    for (const p of this.players) { p.chDone = {}; p.won = {}; }
+    for (const p of this.order()) {
+      this.activeP = p;
+      let guard = 0;
+      while (guard++ < 10) {
+        const ctx = { phase: 'challenges', active: p, beforeChallenge: true };
+        const acts = this.availableActions(p, ctx);
+        const buttons = CH_TYPES.filter(t => this.challengeAllowed(p, t)).map(t => ({ label: LX(`Desafio ${CH_NAMES[t]}`, `${CH_NAMES[t]} challenge`), value: t, ai: AI.challengeScore(this, p, t) }));
+        const ch = await p.ctrl.actionWindow(this, p, { prompt: LX('Challenges: inicia um desafio, usa uma ação ou passa.', 'Challenges: initiate a challenge, use an action, or pass.'), actions: acts, buttons, passLabel: LX('Terminar desafios', 'Done with challenges'), ctx });
+        if (!ch) break;
+        if (ch.run) { await ch.run(); this.emit(); continue; }
+        if (ch.button) { await this.doChallenge(p, ch.button); this.checkWin(); }
+      }
+    }
+    this.activeP = null;
+    await this.endPhase();
+  }
+  async doChallenge(att, type) {
+    const def = att.opp;
+    const jousting = this.anyPlot('01014');
+    const cands = att.chars.filter(c => this.canAttackWith(att, c, type));
+    const attackers = await att.ctrl.chooseCards(this, att, { prompt: LX(`Desafio ${CH_NAMES[type]}: escolhe os atacantes`, `${CH_NAMES[type]} challenge: choose attackers`), cands, min: 1, max: jousting ? 1 : cands.length, ai: null, aiPick: () => AI.pickAttackers(this, att, type, cands, jousting) });
+    if (!attackers.length) return;
+    att.chDone[type] = (att.chDone[type] || 0) + 1;
+    const ch = this.ch = { type, att, def, attackers: [...attackers], defenders: [], claimMod: 0, stealthed: [], winner: null, loser: null, diff: 0, afterWinCbs: [] };
+    for (const c of attackers) if (!(ab(c).noKneelAttack && !this.blank(c) && ab(c).noKneelAttack(this, c, type))) c.kneel = true;
+    this.log(LX(`⚔ ${att.name} inicia um desafio ${CH_NAMES[type]} com ${attackers.map(c => this.cn(c)).join(', ')}.`, `⚔ ${att.name} initiates a challenge (${CH_NAMES[type]}) with ${attackers.map(c => this.cn(c)).join(', ')}.`), 'ch');
+    this.emit();
+    await this.fire('afterChallengeInitiated', ch);
+    // stealth
+    for (const c of ch.attackers) if (this.hasKw(c, 'stealth')) {
+      const t = def.chars.filter(x => !this.hasKw(x, 'stealth') && !ch.stealthed.includes(x));
+      if (!t.length) continue;
+      const [s] = await att.ctrl.chooseCards(this, att, { prompt: LX(`Stealth de ${this.cn(c)}: escolhe uma personagem que não pode defender`, `${this.cn(c)}'s stealth: choose a character that cannot defend`), cands: t, min: 0, max: 1, ai: x => AI.stealthScore(this, att, x, type) });
+      if (s) { ch.stealthed.push(s); this.log(LX(`${this.cn(c)} usa stealth em ${this.cn(s)}.`, `${this.cn(c)} uses stealth on ${this.cn(s)}.`)); }
+    }
+    // defensores
+    const dc = def.chars.filter(c => !c.kneel && this.hasIcon(c, type) && !ch.stealthed.includes(c));
+    if (dc.length) {
+      const defenders = await def.ctrl.chooseCards(this, def, { prompt: LX(`${att.name} ataca (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Escolhe os defensores (ou nenhum).`, `${att.name} attacks (${CH_NAMES[type]}, STR ${this.sumStr(ch.attackers)}). Choose defenders (or none).`), cands: dc, min: 0, max: jousting ? 1 : dc.length, aiPick: () => AI.pickDefenders(this, def, ch, dc, jousting), doneLabel: LX('Confirmar defesa', 'Confirm defense') });
+      ch.defenders = [...defenders];
+      for (const c of defenders) c.kneel = true;
+      if (defenders.length) this.log(LX(`${def.name} defende com ${defenders.map(c => this.cn(c)).join(', ')}.`, `${def.name} defends with ${defenders.map(c => this.cn(c)).join(', ')}.`), 'ch'); else this.log(LX(`${def.name} não defende.`, `${def.name} does not defend.`), 'ch');
+    } else this.log(LX(`${def.name} não tem defensores disponíveis.`, `${def.name} has no available defenders.`), 'ch');
+    this.emit();
+    // janela de ações
+    await this.actionRound({ phase: 'challenges', ch, active: att }, def, LX(`Desafio ${CH_NAMES[type]} — Ataque ${this.sumStr(ch.attackers)} × Defesa ${this.sumStr(ch.defenders)}. Ações?`, `${CH_NAMES[type]} challenge — Attack ${this.sumStr(ch.attackers)} × Defense ${this.sumStr(ch.defenders)}. Actions?`));
+    // resultado
+    const A = this.sumStr(ch.attackers), D = this.sumStr(ch.defenders);
+    if (A >= D && A > 0 && ch.attackers.length) { ch.winner = att; ch.loser = def; }
+    else if (D > A) { ch.winner = def; ch.loser = att; }
+    ch.diff = Math.abs(A - D);
+    if (!ch.winner) { this.log(LX(`Desafio ${CH_NAMES[type]}: sem vencedor (${A} × ${D}).`, `${CH_NAMES[type]} challenge: no winner (${A} × ${D}).`), 'ch'); this.cleanupChallenge(); return; }
+    this.log(LX(`Desafio ${CH_NAMES[type]}: ${ch.winner.name} vence (${A} × ${D}).`, `${CH_NAMES[type]} challenge: ${ch.winner.name} wins (${A} × ${D}).`), 'chw');
+    ch.winner.won[type] = (ch.winner.won[type] || 0) + 1;
+    if (ch.winner === att) {
+      if (D === 0) { this.log(LX('Desafio sem oposição (unopposed): +1 poder.', 'Unopposed challenge: +1 power.')); this.gainPower(att, 1); }
+      await this.applyClaim(ch);
+    }
+    await this.keywords(ch);
+    // reações de vitória
+    await this.fire('afterWin', ch);
+    for (const f of ch.afterWinCbs) await f();
+    await this.offerEvents(ch.winner, 'afterWin', ch);
+    await this.offerEvents(ch.loser, 'afterLose', ch);
+    this.cleanupChallenge();
+    this.checkWin();
+  }
+  sumStr(list) { return list.filter(c => c.zone === 'chars').reduce((s, c) => s + this.str(c), 0); }
+  claimValue(ch) {
+    let v = ch.att.plot ? ch.att.plot.d.p[2] : 1;
+    v += ch.claimMod;
+    for (const c of ch.attackers) if (!this.blank(c) && ab(c).claimMod) v += ab(c).claimMod(this, c, ch);
+    if (this.myPlot(ch.def, '01008') && ch.def.plot.flags.calmType === ch.type) v -= 1;
+    return Math.max(0, v);
+  }
+  async applyClaim(ch) {
+    const n = this.claimValue(ch), L = ch.loser, W = ch.winner;
+    if (n <= 0) return;
+    this.log(`Claim ${n} (${CH_NAMES[ch.type]}).`);
+    if (ch.type === 'military') {
+      for (let i = 0; i < n; i++) {
+        const cands = L.chars.filter(c => !(ch.killedByClaim || []).includes(c));
+        if (!cands.length) break;
+        const [v] = await L.ctrl.chooseCards(this, L, { prompt: LX(`Claim militar: escolhe uma personagem tua para morrer (${i + 1}/${n})`, `Military claim: choose one of your characters to kill (${i + 1}/${n})`), cands, min: 1, max: 1, ai: x => -AI.value(this, x) + (x.dupes.length ? 20 : 0) });
+        (ch.killedByClaim = ch.killedByClaim || []).push(v);
+        await this.kill(v);
+      }
+    } else if (ch.type === 'intrigue') {
+      for (let i = 0; i < n && L.hand.length; i++) { const c = L.hand[Math.floor(Math.random() * L.hand.length)]; this.discardFromHand(L, c); this.log(LX(`${L.name} descarta ao acaso: ${this.cn(c)}.`, `${L.name} discards at random: ${this.cn(c)}.`)); }
+    } else {
+      this.movePower(L, W, n);
+    }
+    this.emit();
+  }
+  async keywords(ch) {
+    const W = ch.winner, L = ch.loser;
+    const parts = (W === ch.att ? ch.attackers : ch.defenders).filter(c => c.zone === 'chars');
+    let intimDone = false;
+    for (const c of parts) {
+      if (this.hasKw(c, 'insight')) { this.log(`Insight (${this.cn(c)}):`); this.draw(W, 1); }
+      if (this.hasKw(c, 'intimidate') && !intimDone) {
+        const t = L.chars.filter(x => !x.kneel && this.str(x) <= ch.diff);
+        if (t.length) {
+          const [k] = await W.ctrl.chooseCards(this, W, { prompt: LX(`Intimidate (${this.cn(c)}): ajoelha uma personagem com STR ≤ ${ch.diff}`, `Intimidate (${this.cn(c)}): kneel a character with STR ≤ ${ch.diff}`), cands: t, min: 0, max: 1, ai: x => AI.value(this, x) });
+          if (k) { k.kneel = true; intimDone = true; this.log(LX(`${this.cn(c)} intimida ${this.cn(k)} (ajoelhada).`, `${this.cn(c)} intimidates ${this.cn(k)} (knelt).`)); }
+        }
+      }
+      if (this.hasKw(c, 'pillage')) { this.log(`Pillage (${this.cn(c)}):`); this.discardTop(L); }
+      if (this.hasKw(c, 'renown')) this.gainPower(W, 1, c);
+    }
+  }
+  async offerEvents(p, timing, ch) {
+    if (!p) return;
+    let guard = 0;
+    while (guard++ < 5) {
+      const evs = p.hand.filter(c => this.canPlayEvent(p, c, timing, ch) && !(ch.usedEvents || []).includes(c.code));
+      if (!evs.length) return;
+      const acts = evs.map(c => ({ card: c, label: LX(`Jogar ${this.cn(c)}`, `Play ${this.cn(c)}`), ai: ab(c).ev.ai ? ab(c).ev.ai(this, p, ch) : 1, run: async () => { (ch.usedEvents = ch.usedEvents || []).push(c.code); await this.playEvent(p, c, ch); } }));
+      const a = await p.ctrl.actionWindow(this, p, { prompt: timing === 'afterWin' ? LX('Ganhaste o desafio — reação?', 'You won the challenge — reaction?') : LX('Perdeste o desafio — reação?', 'You lost the challenge — reaction?'), actions: acts, passLabel: LX('Não', 'No'), ctx: { phase: 'challenges', ch, reaction: true } });
+      if (!a) return;
+      await a.run();
+    }
+  }
+  cleanupChallenge() {
+    const ch = this.ch; if (!ch) return;
+    for (const c of this.allChars()) { c.tmp = 0; c.tmpIcons = ''; c.tmpKw = {}; }
+    this.ch = null; this.emit();
+  }
+  // ---------- dominance ----------
+  domStr(p) {
+    let s = p.gold;
+    for (const c of p.chars) if (!c.kneel) s += this.str(c);
+    for (const c of this.inPlay(p)) if (!this.blank(c) && ab(c).domStr) s += ab(c).domStr(this, c);
+    return s;
+  }
+  async dominancePhase() {
+    this.phase = 'dominance'; this.log('— Dominance —', 'phase');
+    await this.actionRound({ phase: 'dominance' }, this.first, LX('Dominance: ações antes de calcular?', 'Dominance: actions before it is determined?'));
+    const [a, b] = this.players; const da = this.domStr(a), db = this.domStr(b);
+    this.log(`Dominance: ${a.name} ${da} × ${b.name} ${db}.`);
+    if (da !== db) {
+      const w = da > db ? a : b; this.log(LX(`${w.name} ganha dominance.`, `${w.name} wins dominance.`), 'chw'); this.gainPower(w, 1);
+      if (this.myPlot(w, '01002')) { this.log('A Feast for Crows:'); this.gainPower(w, 2); }
+    } else this.log(LX('Empate: ninguém ganha dominance.', 'Tie: nobody wins dominance.'));
+    await this.fire('onDominanceEnd');
+    await this.endPhase();
+  }
+  async standingPhase() {
+    this.phase = 'standing'; this.log('— Standing —', 'phase');
+    const stood = [];
+    for (const p of this.players) { p.fknelt = false; for (const c of this.inPlay(p)) if (c.kneel) { c.kneel = false; stood.push(c); } }
+    for (const c of stood) if (c.zone === 'chars' && !this.blank(c) && ab(c).afterStand && this.canTrigger(c.owner)) await ab(c).afterStand(this, c);
+    await this.endPhase();
+  }
+  async taxationPhase() {
+    this.phase = 'taxation'; this.log('— Taxation —', 'phase');
+    for (const p of this.players) p.gold = 0;
+    for (const p of this.order()) {
+      const r = this.reserve(p); const over = p.hand.length - r;
+      if (over > 0) {
+        const cs = await p.ctrl.chooseCards(this, p, { prompt: LX(`Reserve ${r}: descarta ${over} carta${over > 1 ? 's' : ''} da mão`, `Reserve ${r}: discard ${over} card${over > 1 ? 's' : ''} from your hand`), cands: [...p.hand], min: over, max: over, ai: x => -AI.handValue(this, p, x) });
+        for (const c of cs) this.discardFromHand(p, c);
+        this.log(LX(`${p.name} descarta ${over} carta(s) por reserve.`, `${p.name} discards ${over} card(s) to reserve.`));
+      }
+    }
+    await this.endPhase();
+  }
+}
+
+// ================= HABILIDADES AUTOMATIZADAS =================
+// Para adicionar uma carta: cria AB['código'] = { pt: 'descrição', ...hooks }.
+// Hooks: str, icons, kw, grantKw, noKneelAttack, entersKnelt, onEnter, actions, afterWin, afterChallengeInitiated,
+//        afterCharLeaves, afterStand, onPhaseEnd, onDominanceEnd, claimMod, domStr, attachOk, attStr, attIcons, ev, reveal
+const isLordLady = c => c.d.tr.includes('Lord') || c.d.tr.includes('Lady');
+const participating = (g, c) => !!g.ch && (g.ch.attackers.includes(c) || g.ch.defenders.includes(c));
+const opps = (g, p) => p.opp;
+
+function reducerAct(g, c, amt, filter, desc, opts = {}) {
+  const p = c.owner;
+  if (c.kneel || g.phase !== 'marshal' || g.activeP !== p) return [];
+  return [{
+    label: LX(`${opts.sac ? 'Ajoelhar e sacrificar' : 'Ajoelhar'}: −${amt} no próximo ${desc}`, `${opts.sac ? 'Kneel and sacrifice' : 'Kneel'}: −${amt} to your next ${desc}`),
+    ai: AI.reducerScore(g, p, filter, amt, opts.sac),
+    run: async () => {
+      c.kneel = true; p.reducers.push({ amt, f: filter, modes: opts.modes || ['marshal'] });
+      g.log(LX(`${p.name} ajoelha ${g.cn(c)} (−${amt} no próximo ${desc}).`, `${p.name} kneels ${g.cn(c)} (−${amt} to the next ${desc}).`));
+      if (opts.sac) await g.sacrifice(c);
+    }
+  }];
+}
+async function searchTop(g, p, n, filter, what) {
+  const top = p.deck.slice(0, n).filter(filter);
+  if (top.length) {
+    const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX(`Procura ${what} nas ${n} cartas do topo`, `Search the top ${n} cards for ${what}`), cands: top, min: 0, max: 1, ai: x => AI.handValue(g, p, x) + 1, modal: true });
+    if (c) { g.removeFromZone(c); g.toZone(c, 'hand'); g.log(LX(`${p.name} revela ${g.cn(c)} e junta-a à mão.`, `${p.name} reveals ${g.cn(c)} and adds it to their hand.`)); }
+  } else g.log(LX(`${p.name} não encontrou ${what}.`, `${p.name} did not find ${what}.`));
+  shuffle(p.deck);
+}
+
+// ---------------- PLOTS ----------------
+Object.assign(AB, {
+  '01001': { pt: 'Reação: depois de ganhares um desafio de Poder, move 1 poder da facção do adversário para a tua.',
+    afterWin: (g, c, ch) => { if (ch.winner === c.owner && ch.type === 'power') { g.log('A Clash of Kings:'); g.movePower(ch.loser, c.owner, 1); } } },
+  '01002': { pt: 'Reação: depois de ganhares dominance, ganha 2 poder para a tua facção.' },
+  '01003': { pt: 'Nenhum jogador pode iniciar desafios Militares ou de Poder sem ter ganho um desafio de Intriga nessa fase.' },
+  '01004': { pt: 'Reduz em 2 o custo da primeira personagem Lord ou Lady que fizeres marshal nesta ronda.' },
+  '01005': { pt: 'Podes iniciar um desafio Militar adicional.' },
+  '01006': { pt: 'Ao revelar: procura nas 10 cartas do topo um anexo ou local e junta-o à mão. Baralha.',
+    reveal: (g, p) => searchTop(g, p, 10, c => ['attachment', 'location'].includes(c.d.t), LX('um anexo ou local', 'an attachment or location')) },
+  '01007': { pt: 'Ao revelar: ganha 1 ouro por cada personagem que o adversário controla.',
+    reveal: (g, p) => { const n = p.opp.chars.length; p.gold += n; g.log(LX(`Calling the Banners: ${p.name} ganha ${n} ouro.`, `Calling the Banners: ${p.name} gains ${n} gold.`), 'gold'); } },
+  '01008': { pt: 'Ao revelar: escolhe um tipo de desafio. Nesses desafios em que defendes, o claim do atacante é reduzido em 1.',
+    reveal: async (g, p, pl) => { const t = await p.ctrl.chooseOption(g, p, { prompt: LX('Calm Over Westeros: escolhe o tipo de desafio', 'Calm Over Westeros: name a challenge type'), options: CH_TYPES.map(t => ({ label: CH_NAMES[t], value: t })), ai: o => o.value === 'military' ? 2 : o.value === 'power' ? 1 : 0 }); pl.flags.calmType = t; g.log(`Calm Over Westeros: ${CH_NAMES[t]}.`); } },
+  '01009': { pt: 'Ao revelar: escolhe um anexo e descarta-o de jogo.',
+    reveal: async (g, p) => { const t = [...g.attsOf(p), ...g.attsOf(p.opp)]; if (!t.length) return; const [a] = await p.ctrl.chooseCards(g, p, { prompt: LX('Confiscation: escolhe um anexo para descartar', 'Confiscation: choose an attachment to discard'), cands: t, min: 1, max: 1, ai: x => x.owner === p ? -5 : 5 + (x.d.cost || 0) }); await g.discardFromPlay(a); } },
+  '01010': { pt: 'Ao revelar: compra 3 cartas.', reveal: (g, p) => { g.draw(p, 3); } },
+  '01011': { pt: 'Ao revelar: escolhe e ajoelha uma personagem.',
+    reveal: async (g, p) => { const t = g.allChars().filter(c => !c.kneel); if (!t.length) return; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Filthy Accusations: escolhe uma personagem para ajoelhar', 'Filthy Accusations: choose a character to kneel'), cands: t, min: 1, max: 1, ai: x => x.owner === p ? -10 : g.str(x) + AI.value(g, x) }); c.kneel = true; g.log(LX(`${g.cn(c)} fica ajoelhado(a).`, `${g.cn(c)} is knelt.`)); } },
+  '01012': { pt: 'Trata a caixa de texto de todas as personagens como vazia (exceto Traits).' },
+  '01013': { pt: 'Ao revelar: descarta 1 carta ao acaso da mão do adversário. Se for personagem, vai para a dead pile e ganhas 2 poder.',
+    reveal: (g, p) => { const q = p.opp; if (!q.hand.length) return; const c = q.hand[Math.floor(Math.random() * q.hand.length)]; g.removeFromZone(c); if (c.d.t === 'character') { g.toZone(c, 'dead'); g.log(LX(`Heads on Spikes: ${g.cn(c)} vai para a dead pile de ${q.name}.`, `Heads on Spikes: ${g.cn(c)} goes to ${q.name}'s dead pile.`)); g.gainPower(p, 2); } else { g.toZone(c, 'discard'); g.log(LX(`Heads on Spikes: ${q.name} descarta ${g.cn(c)}.`, `Heads on Spikes: ${q.name} discards ${g.cn(c)}.`)); } } },
+  '01014': { pt: 'Cada jogador só pode declarar 1 atacante ou defensor por desafio.' },
+  '01015': { pt: 'Ao revelar: cada jogador escolhe uma personagem sua e descarta-a de jogo (não pode ser salva).',
+    reveal: async (g, p) => { for (const q of g.order()) { if (!q.chars.length) continue; const [c] = await q.ctrl.chooseCards(g, q, { prompt: LX('Marched to the Wall: escolhe uma personagem tua para descartar', 'Marched to the Wall: choose one of your characters to discard'), cands: [...q.chars], min: 1, max: 1, ai: x => -AI.value(g, x) }); await g.discardFromPlay(c, { save: false }); } } },
+  '01016': { pt: 'Não podes fazer marshal de locais ou anexos, nem jogar eventos.' },
+  '01017': { pt: 'O ouro base de cada plot Kingdom ou Edict revelado conta como 0.' },
+  '01018': { pt: 'Ao revelar: coloca 1 marcador. Ação: descarta o marcador para escolher e levantar uma personagem.',
+    reveal: (g, p, pl) => { pl.flags.tokens = 1; },
+    actions: (g, pl, ctx) => { const p = pl.owner; if (!pl.flags.tokens) return []; const t = p.chars.filter(c => c.kneel); if (!t.length) return [];
+      return [{ label: LX('Power Behind the Throne: levantar uma personagem', 'Power Behind the Throne: stand a character'), ai: AI.standScore(g, p, ctx), run: async () => { const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe uma personagem para levantar', 'Choose a character to stand'), cands: t, min: 1, max: 1, ai: x => g.str(x) }); pl.flags.tokens = 0; c.kneel = false; g.log(LX(`${p.name} levanta ${g.cn(c)} (Power Behind the Throne).`, `${p.name} stands ${g.cn(c)} (Power Behind the Throne).`)); } }]; } },
+  '01019': { pt: 'Ao revelar: escolhe até 3 cartas do teu descarte e baralha-as no baralho.',
+    reveal: async (g, p) => { if (!p.discard.length) return; const cs = await p.ctrl.chooseCards(g, p, { prompt: LX('Rebuilding: escolhe até 3 cartas do descarte', 'Rebuilding: choose up to 3 cards from your discard pile'), cands: [...p.discard], min: 0, max: 3, ai: x => AI.handValue(g, p, x) + 1, modal: true }); for (const c of cs) { g.removeFromZone(c); c.zone = 'deck'; p.deck.push(c); } shuffle(p.deck); g.log(LX(`${p.name} baralha ${cs.length} carta(s) do descarte no baralho.`, `${p.name} shuffles ${cs.length} card(s) from discard into their deck.`)); } },
+  '01020': { pt: 'Ao revelar: põe em jogo uma personagem com custo impresso 5 ou menos da tua mão ou descarte.',
+    reveal: async (g, p) => { const t = [...p.hand, ...p.discard].filter(c => c.d.t === 'character' && (c.d.cost || 0) <= 5 && !g.uniqueBlockedByDead(p, c)); if (!t.length) return; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Reinforcements: escolhe uma personagem para pôr em jogo', 'Reinforcements: choose a character to put into play'), cands: t, min: 0, max: 1, ai: x => AI.value(g, x), modal: true }); if (c) await g.putIntoPlay(p, c, 'put'); } },
+  '01021': { pt: 'Não podes iniciar mais de 1 desafio na fase de desafios.' },
+  '01022': { pt: 'Ao revelar: procura nas 10 cartas do topo uma personagem e junta-a à mão. Baralha.',
+    reveal: (g, p) => searchTop(g, p, 10, c => c.d.t === 'character', LX('uma personagem', 'a character')) },
+  '01023': { pt: 'Quando começa a fase de desafios, todos os jogadores devolvem o ouro ao tesouro.' },
+  '01024': { pt: 'Podes jogar 1 carta limitada adicional nesta ronda.' },
+  '01026': { pt: 'Ao revelar: cada jogador escolhe até 3 personagens suas. Todas as outras morrem (não podem ser salvas).',
+    reveal: async (g, p) => { for (const q of g.order()) { if (q.chars.length <= 3) continue; const keep = await q.ctrl.chooseCards(g, q, { prompt: LX('Wildfire Assault: escolhe até 3 personagens para sobreviver', 'Wildfire Assault: choose up to 3 characters to survive'), cands: [...q.chars], min: 0, max: 3, ai: x => AI.value(g, x) + 1 }); for (const c of [...q.chars]) if (!keep.includes(c)) await g.kill(c, { save: false }); } } },
+});
+
+// ---------------- AGENDAS ----------------
+Object.assign(AB, {
+  '01027': { pt: 'Máx. 15 cartas neutras no deck. Ação: ajoelha a carta de facção para reduzir em 1 o custo da próxima carta loyal que jogares nesta fase.',
+    factionActions: (g, p, ctx) => { if (p.fknelt || ctx.reaction) return []; const f = c => !!c.d.l; return [{ label: LX('Fealty: ajoelhar facção (−1 na próxima carta loyal)', 'Fealty: kneel faction (−1 to next loyal card)'), ai: g.phase === 'marshal' && g.activeP === p ? AI.reducerScore(g, p, f, 1) : 0, run: async () => { p.fknelt = true; p.reducers.push({ amt: 1, f, modes: ['marshal', 'play'] }); g.log(LX(`${p.name} ajoelha a facção (Fealty).`, `${p.name} kneels their faction card (Fealty).`)); } }]; } },
+});
+['01198', '01199', '01200', '01201', '01202', '01203', '01204', '01205'].forEach(c => AB[c] = { pt: 'Podes incluir cartas não-loyal da facção do estandarte; tens de incluir pelo menos 12 dessa facção.' });
+
+// ---------------- NEUTRAS ----------------
+Object.assign(AB, {
+  '01028': { pt: 'Reação: depois de fazeres marshal do Littlefinger, compra 2 cartas. +1 Income.', onEnter: (g, c, how) => { if (how === 'marshal') g.draw(c.owner, 2); } },
+  '01029': { pt: 'Stealth. Interrupção: quando termina a fase de dominance, remove o Varys do jogo para descartar todas as personagens.',
+    onDominanceEnd: async (g, c) => { const p = c.owner; const v = await p.ctrl.chooseOption(g, p, { prompt: LX('Varys: remover do jogo para descartar TODAS as personagens?', 'Varys: remove him from the game to discard ALL characters?'), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value ? AI.varysScore(g, p) : 0, card: c });
+      if (!v) return; g.leavePlay(c, 'removed'); g.log(LX(`${p.name} remove Varys do jogo!`, `${p.name} removes Varys from the game!`), 'kill'); for (const x of g.allChars()) await g.discardFromPlay(x); } },
+  '01030': { pt: 'Sem anexos. Reação: depois de ganhares um desafio em que ataca, descarta um anexo controlado pelo adversário.',
+    afterWin: async (g, c, ch) => { const p = c.owner; if (ch.winner !== p || !ch.attackers.includes(c)) return; const t = g.attsOf(ch.loser); if (!t.length) return; const [a] = await p.ctrl.chooseCards(g, p, { prompt: LX("Rattleshirt's Raiders: descarta um anexo", "Rattleshirt's Raiders: discard an attachment"), cands: t, min: 0, max: 1, ai: x => 1 + (x.d.cost || 0) }); if (a) await g.discardFromPlay(a); } },
+  '01031': { pt: 'Sem anexos. Pillage. Ação (desafios): ajoelha a facção para dar +2 STR a uma Wildling tua que participe.',
+    actions: (g, c, ctx) => { const p = c.owner; if (!ctx.ch || p.fknelt) return []; const t = p.chars.filter(x => x.d.tr.includes('Wildling') && participating(g, x)); if (!t.length || c !== p.chars.find(x => x.code === '01031')) return [];
+      return [{ label: LX('Wildling Horde: ajoelhar facção, +2 STR', 'Wildling Horde: kneel faction, +2 STR'), ai: AI.pumpScore(g, p, ctx.ch, 2), run: async () => { p.fknelt = true; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Escolhe a Wildling', 'Choose the Wildling'), cands: t, min: 1, max: 1, ai: () => 1 }); x.tmp += 2; g.log(LX(`${g.cn(x)} ganha +2 STR.`, `${g.cn(x)} gets +2 STR.`)); } }]; } },
+  '01032': { pt: 'Só Lord ou Lady. Ação: ajoelha o Seal of the Hand para levantar a personagem anexada.', attachOk: (g, a, t) => isLordLady(t),
+    actions: (g, a, ctx) => { if (a.kneel || !a.parent || !a.parent.kneel || a.parent.owner !== a.owner) return []; return [{ label: LX('Seal of the Hand: levantar ', 'Seal of the Hand: stand ') + g.cn(a.parent), ai: AI.standScore(g, a.owner, ctx), run: async () => { a.kneel = true; a.parent.kneel = false; g.log(LX(`${g.cn(a.parent)} é levantado (Seal of the Hand).`, `${g.cn(a.parent)} stands (Seal of the Hand).`)); } }]; } },
+  '01033': { pt: 'Só Lord ou Lady. Interrupção: quando a personagem seria morta ou descartada, sacrifica o Bodyguard para a salvar.', attachOk: (g, a, t) => isLordLady(t) },
+  '01034': { pt: 'A personagem ganha um ícone de Intriga.', attIcons: () => 'I' },
+  '01035': { pt: 'Terminal. A caixa de texto da personagem anexada conta como vazia.' },
+  '01036': { pt: 'A personagem ganha um ícone de Poder.', attIcons: () => 'P' },
+  '01037': { pt: 'A personagem ganha um ícone Militar.', attIcons: () => 'M' },
+  '01038': { pt: 'Contribui com 8 STR para a tua dominance. +1 Reserve.', domStr: () => 8 },
+  '01039': { pt: 'Limited. Ação de marshaling: ajoelha e sacrifica para reduzir em 3 o custo da próxima personagem. +1 Initiative.',
+    actions: (g, c) => reducerAct(g, c, 3, x => x.d.t === 'character', LX('personagem', 'character'), { sac: true }) },
+  '01040': { pt: 'Limited. +1 Income.' },
+  '01041': { pt: 'Reação: depois de ganhares um desafio Militar como atacante por 5+ STR, mata uma personagem do adversário.',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type === 'military' && ch.att === p && ch.diff >= 5 && ch.loser.chars.length, ai: () => 20,
+      run: async (g, p, e, ch) => { const t = ch.loser.chars; if (!t.length) return; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Put to the Sword: escolhe uma personagem para matar', 'Put to the Sword: choose a character to kill'), cands: [...t], min: 1, max: 1, ai: x => AI.value(g, x) }); await g.kill(c); } } },
+  '01042': { pt: 'Reação: depois de ganhares um desafio Militar como atacante por 5+ STR, descarta um local do adversário.',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type === 'military' && ch.att === p && ch.diff >= 5 && ch.loser.locs.length, ai: () => 15,
+      run: async (g, p, e, ch) => { const t = ch.loser.locs; if (!t.length) return; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Put to the Torch: escolhe um local para descartar', 'Put to the Torch: choose a location to discard'), cands: [...t], min: 1, max: 1, ai: x => (x.d.cost || 0) + 3 }); await g.discardFromPlay(c); } } },
+  '01043': { pt: 'Reação: depois de ganhares um desafio de Poder por 5+ STR, ganha 2 poder.',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type === 'power' && ch.diff >= 5, ai: () => 30, run: async (g, p) => { g.gainPower(p, 2); } } },
+  '01044': { pt: 'Reação: depois de ganhares um desafio de Intriga como atacante, coloca veneno numa personagem sem ícone de Intriga do adversário; no fim da fase, se ainda o tiver, morre.',
+    ev: { timing: 'afterWin', cond: (g, p, ch) => ch.type === 'intrigue' && ch.att === p && ch.loser.chars.some(c => !g.hasIcon(c, 'intrigue')), ai: () => 18,
+      run: async (g, p, e, ch) => { const t = ch.loser.chars.filter(c => !g.hasIcon(c, 'intrigue')); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Tears of Lys: escolhe a personagem a envenenar', 'Tears of Lys: choose the character to poison'), cands: t, min: 1, max: 1, ai: x => AI.value(g, x) }); c.flags.poison = true; g.log(LX(`${g.cn(c)} foi envenenado.`, `${g.cn(c)} is poisoned.`));
+        g.endOfPhase.push(async () => { if (c.zone === 'chars' && c.flags.poison) { c.flags.poison = false; g.log(LX(`O veneno faz efeito em ${g.cn(c)}.`, `The poison takes effect on ${g.cn(c)}.`)); await g.kill(c); } }); } } },
+  '01045': { pt: 'Interrupção: quando um evento do adversário seria iniciado, cancela-o. X é o custo impresso desse evento.' },
+});
+
+// ---------------- LANNISTER ----------------
+Object.assign(AB, {
+  '01084': { pt: 'Enquanto ataca num desafio de Intriga, o claim do teu plot sobe 1.', claimMod: (g, c, ch) => ch.type === 'intrigue' ? 1 : 0 },
+  '01086': { pt: 'Reação: depois de uma personagem Lord ou Lady morrer, o Joffrey ganha 1 poder (máx. 3 por ronda).',
+    afterCharLeaves: (g, c, v, how) => { if (how === 'killed' && isLordLady(v) && (c.flags.joff || 0) < 3) { c.flags.joff = (c.flags.joff || 0) + 1; g.gainPower(c.owner, 1, c); } } },
+  '01087': { pt: 'Não ajoelha ao atacar num desafio Militar e ganha renown enquanto participa num desafio Militar.',
+    noKneelAttack: (g, c, t) => t === 'military', kw: (g, c) => (g.ch && g.ch.type === 'military' && participating(g, c)) ? { renown: 1 } : {} },
+  '01088': { pt: 'Ação de dominance: ajoelha o Tickler para descartar a carta do topo do baralho do adversário. Depois podes descartar de jogo uma cópia dessa carta.',
+    actions: (g, c, ctx) => { if (c.kneel || g.phase !== 'dominance') return []; const p = c.owner;
+      return [{ label: LX('The Tickler: descartar topo do adversário', "The Tickler: discard top of opponent's deck"), ai: 6, run: async () => { c.kneel = true; const d = g.discardTop(p.opp); if (!d) return; const t = g.allInPlay().filter(x => x.d.n === d.d.n); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX(`Descartar uma cópia de ${d.d.n} em jogo?`, `Discard a copy of ${d.d.n} from play?`), cands: t, min: 0, max: 1, ai: y => y.owner === p ? -10 : 10 }); if (x) await g.discardFromPlay(x); } }]; } },
+  '01089': { pt: 'Stealth. Reação: depois de um desafio de Intriga ser iniciado, ganha 2 ouro (máx. 2 vezes por ronda).',
+    afterChallengeInitiated: (g, c, ch) => { if (ch.type === 'intrigue' && (c.flags.ty || 0) < 2) { c.flags.ty = (c.flags.ty || 0) + 1; c.owner.gold += 2; g.log(LX(`Tyrion: ${c.owner.name} ganha 2 ouro.`, `Tyrion: ${c.owner.name} gains 2 gold.`), 'gold'); } } },
+  '01090': { pt: 'Renown. +1 STR por cada ouro no teu gold pool. +2 Income.', str: (g, c) => c.owner.gold },
+  '01092': { pt: 'Ambush (2). Interrupção forçada: no fim da fase em que entrou por ambush, é descartado (não pode ser salvo).',
+    onPhaseEnd: async (g, c, ph) => { if (c.flags.ambushed === ph) { await g.discardFromPlay(c, { save: false }); } } },
+  '01094': { pt: 'Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima personagem Lannister.', actions: (g, c) => reducerAct(g, c, 1, x => x.d.t === 'character' && x.d.f === 'lannister', LX('personagem Lannister', 'Lannister character')) },
+  '01095': { pt: 'Ambush (4). Reação: depois de entrar por ambush, se tens mais cartas na mão que o adversário, ele escolhe e mata uma personagem sua.',
+    onEnter: async (g, c, how) => { if (how !== 'ambush') return; const p = c.owner, q = p.opp; if (p.hand.length > q.hand.length && q.chars.length) { const [v] = await q.ctrl.chooseCards(g, q, { prompt: LX("The Queen's Assassin: escolhe uma personagem tua para morrer", "The Queen's Assassin: choose one of your characters to kill"), cands: [...q.chars], min: 1, max: 1, ai: x => -AI.value(g, x) + (x.dupes.length ? 20 : 0) }); await g.kill(v); } } },
+  '01096': { pt: 'Ambush (1). +2 STR. Se estiver no Joffrey Baratheon, ele ganha um ícone Militar.', attStr: () => 2, attIcons: (g, a, t) => t.code === '01086' ? 'M' : '' },
+  '01097': { pt: 'Podes iniciar um desafio de Intriga adicional.' },
+  '01098': { pt: 'Reação: depois de ganhares um desafio de Intriga, compra 1 carta.', afterWin: (g, c, ch) => { if (ch.winner === c.owner && ch.type === 'intrigue') { g.log('Lannisport:'); g.draw(c.owner, 1); } } },
+  '01099': { pt: 'Limited. Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima carta Lannister.', actions: (g, c) => reducerAct(g, c, 1, x => x.d.f === 'lannister', LX('carta Lannister', 'Lannister card')) },
+  '01100': { pt: 'Ação: põe em jogo uma personagem Lannister da tua mão. No fim da fase, se ainda estiver em jogo, é descartada.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !ctx.reaction && p.hand.some(c => c.d.t === 'character' && c.d.f === 'lannister' && !g.uniqueBlockedByDead(p, c)), ai: (g, p, ctx) => AI.hmrScore(g, p, ctx),
+      run: async (g, p) => { const t = p.hand.filter(c => c.d.t === 'character' && c.d.f === 'lannister' && !g.uniqueBlockedByDead(p, c)); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Hear Me Roar!: escolhe a personagem', 'Hear Me Roar!: choose the character'), cands: t, min: 1, max: 1, ai: x => g.str(x) + (x.d.cost || 0) }); const r = await g.putIntoPlay(p, c, 'put'); if (r && r.zone === 'chars') { const tok = Math.random(); r.flags.hmr = tok; g.endOfPhase.push(async () => { if (r.zone === 'chars' && r.flags.hmr === tok) await g.discardFromPlay(r, { save: false }); }); } } } },
+  '01101': { pt: 'Só se controlares um Lord/Lady Lannister. Ação de desafios: ajoelha a facção para devolver à mão uma personagem do adversário com custo impresso ≤ X.',
+    ev: { timing: 'action', cost: () => 0,
+      cond: (g, p, ctx) => g.phase === 'challenges' && !ctx.reaction && !p.fknelt && p.chars.some(c => c.d.f === 'lannister' && isLordLady(c)) && p.opp.chars.some(c => (c.d.cost || 0) <= p.gold),
+      ai: (g, p) => AI.tidflScore(g, p),
+      run: async (g, p) => { const t = p.opp.chars.filter(c => (c.d.cost || 0) <= p.gold); if (!t.length) return; p.fknelt = true; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('The Things I Do For Love: escolhe a personagem a devolver', 'The Things I Do For Love: choose the character to return'), cands: t, min: 1, max: 1, ai: x => AI.value(g, x) }); p.gold -= (c.d.cost || 0); g.log(LX(`(${p.name} paga X=${c.d.cost || 0})`, `(${p.name} pays X=${c.d.cost || 0})`), 'dim'); g.returnToHand(c); } } },
+});
+
+// ---------------- STARK ----------------
+Object.assign(AB, {
+  '01141': { pt: 'Stealth. Com duplicado, ganha ícone Militar. Reação: ao entrar em jogo, coloca a carta do topo do baralho por baixo como duplicado.',
+    icons: (g, c) => c.dupes.length ? 'M' : '',
+    onEnter: (g, c) => { const p = c.owner; const d = p.deck.shift(); if (d) { d.zone = 'dupe'; d.parent = c; c.dupes.push(d); g.log(LX('Arya Stark recebe um duplicado do topo do baralho.', 'Arya Stark gets a duplicate from the top of the deck.')); } } },
+  '01142': { pt: 'Interrupção: quando um evento do adversário seria iniciado, sacrifica o Bran para o cancelar.' },
+  '01143': { pt: 'Enquanto participa num desafio, os adversários não podem ativar habilidades de cartas.' },
+  '01144': { pt: 'Renown. Reação: depois de um desafio ser iniciado contra ti, levanta o Eddard Stark.',
+    afterChallengeInitiated: (g, c, ch) => { if (ch.def === c.owner && c.kneel) { c.kneel = false; g.log(LX('Eddard Stark levanta-se.', 'Eddard Stark stands.')); } } },
+  '01145': { pt: 'Intimidate. Sem anexos. Ação de desafios: ajoelha o Grey Wind para matar uma personagem com STR 1 ou menos (2 ou menos se controlares o Robb Stark).',
+    actions: (g, c, ctx) => { if (c.kneel || g.phase !== 'challenges') return []; const p = c.owner; const lim = p.chars.some(x => x.code === '01146') ? 2 : 1; const t = g.allChars().filter(x => g.str(x) <= lim); if (!t.length) return [];
+      return [{ label: LX(`Grey Wind: matar personagem com STR ≤ ${lim}`, `Grey Wind: kill a character with STR ≤ ${lim}`), ai: AI.greyWindScore(g, p, c, t, ctx), run: async () => { c.kneel = true; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Grey Wind: escolhe a personagem a matar', 'Grey Wind: choose the character to kill'), cands: g.allChars().filter(x => g.str(x) <= lim), min: 1, max: 1, ai: y => y.owner === p ? -50 : AI.value(g, y) }); if (x) await g.kill(x); } }]; } },
+  '01146': { pt: 'Renown. Reação: depois de uma personagem Stark tua ser sacrificada ou morta, levanta todas as tuas personagens (1 vez por ronda).',
+    afterCharLeaves: (g, c, v, how) => { if (v.owner === c.owner && v.d.f === 'stark' && !c.flags.robb) { c.flags.robb = true; c.owner.chars.forEach(x => x.kneel = false); g.log(LX('Robb Stark: todas as personagens Stark levantam-se!', 'Robb Stark: all your characters stand!')); } } },
+  '01147': { pt: 'Entra em jogo ajoelhada. Reação: depois de se levantar, ganha 1 poder para a tua facção (1 vez por ronda).', entersKnelt: true,
+    afterStand: (g, c) => { if (!c.flags.sansa) { c.flags.sansa = true; g.log('Sansa Stark:'); g.gainPower(c.owner, 1); } } },
+  '01148': { pt: 'Sem anexos. O Bran Stark ganha insight. Reação: ao entrar, devolve à mão uma personagem Stark com STR impressa ≤ 2 do descarte ou dead pile.',
+    grantKw: (g, c, t) => t.code === '01142' ? { insight: 1 } : null,
+    onEnter: async (g, c) => { const p = c.owner; const t = [...p.discard, ...p.dead].filter(x => x.d.t === 'character' && x.d.f === 'stark' && (x.d.s || 0) <= 2); if (!t.length) return; const [x] = await p.ctrl.chooseCards(g, p, { prompt: LX('Summer: escolhe uma personagem para voltar à mão', 'Summer: choose a character to return to your hand'), cands: t, min: 0, max: 1, ai: y => 1 + (y.d.cost || 0), modal: true }); if (x) { g.removeFromZone(x); g.toZone(x, 'hand'); g.log(LX(`${g.cn(x)} volta à mão de ${p.name}.`, `${g.cn(x)} returns to ${p.name}'s hand.`)); } } },
+  '01149': { pt: 'Sem anexos. +1 STR por cada outra carta Direwolf que controlas.', str: (g, c) => c.owner.chars.filter(x => x !== c && x.d.tr.includes('Direwolf')).length },
+  '01151': { pt: 'Sem anexos. Enquanto houver um plot War revelado, não ajoelha ao atacar num desafio Militar.', noKneelAttack: (g, c, t) => t === 'military' && g.anyPlotTrait('War') },
+  '01152': { pt: 'Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima personagem Stark.', actions: (g, c) => reducerAct(g, c, 1, x => x.d.t === 'character' && x.d.f === 'stark', LX('personagem Stark', 'Stark character')) },
+  '01153': { pt: 'Só personagem Stark. +2 STR. Reação: depois de ganhares um desafio Militar em que a personagem participa, sacrifica a Ice para matar uma personagem do adversário.',
+    attachOk: (g, a, t) => t.d.f === 'stark', attStr: () => 2,
+    afterWin: async (g, a, ch) => { const p = a.owner; if (ch.winner !== p || ch.type !== 'military' || !a.parent || !participating(g, a.parent) || !ch.loser.chars.length) return;
+      const v = await p.ctrl.chooseOption(g, p, { prompt: LX('Ice: sacrificar para matar uma personagem do adversário?', "Ice: sacrifice it to kill an opponent's character?"), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value ? (Math.max(...ch.loser.chars.map(x => AI.value(g, x))) >= 8 ? 1 : 0) : 0.5, card: a });
+      if (!v) return; await g.sacrifice(a); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('Ice: escolhe a personagem a matar', 'Ice: choose the character to kill'), cands: [...ch.loser.chars], min: 1, max: 1, ai: x => AI.value(g, x) }); if (c) await g.kill(c); } },
+  '01154': { pt: 'Ação de desafios: ajoelha para revelar a carta do topo do baralho. Se for Stark, compra-a.',
+    actions: (g, c) => { if (c.kneel || g.phase !== 'challenges') return []; const p = c.owner; return [{ label: LX('Gates of Winterfell: revelar topo', 'Gates of Winterfell: reveal top card'), ai: 5, run: async () => { c.kneel = true; const t = p.deck[0]; if (!t) return; g.log(LX(`Gates of Winterfell revela ${g.cn(t)}.`, `Gates of Winterfell reveals ${g.cn(t)}.`)); if (t.d.f === 'stark') g.draw(p, 1); } }]; } },
+  '01155': { pt: 'Cada carta Direwolf na tua mão ganha ambush (X), em que X é o seu custo impresso.' },
+  '01156': { pt: 'Limited. Ação de marshaling: ajoelha para reduzir em 1 o custo da próxima carta Stark.', actions: (g, c) => reducerAct(g, c, 1, x => x.d.f === 'stark', LX('carta Stark', 'Stark card')) },
+  '01157': { pt: 'Só durante um desafio Militar. Ação: uma personagem Stark participante ganha +2 STR. Se ganhares o desafio, compra 1 carta.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !!g.ch && g.ch.type === 'military' && !ctx.reaction && p.chars.some(c => c.d.f === 'stark' && participating(g, c)), ai: (g, p) => AI.pumpScore(g, p, g.ch, 2),
+      run: async (g, p) => { const ch = g.ch; const t = p.chars.filter(c => c.d.f === 'stark' && participating(g, c)); const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('For the North!: escolhe a personagem', 'For the North!: choose the character'), cands: t, min: 1, max: 1, ai: () => 1 }); c.tmp += 2; g.log(LX(`${g.cn(c)} ganha +2 STR.`, `${g.cn(c)} gets +2 STR.`)); ch.afterWinCbs.push(async () => { if (ch.winner === p) { g.log('For the North!:'); g.draw(p, 1); } }); } } },
+  '01158': { pt: 'Reação: depois de perderes um desafio de Intriga como defensor, ajoelha uma Direwolf para matar uma personagem atacante.',
+    ev: { timing: 'afterLose', cond: (g, p, ch) => ch.type === 'intrigue' && ch.def === p && p.chars.some(c => c.d.tr.includes('Direwolf') && !c.kneel) && ch.attackers.some(c => c.zone === 'chars'), ai: () => 25,
+      run: async (g, p, e, ch) => { const w = p.chars.filter(c => c.d.tr.includes('Direwolf') && !c.kneel); const [d] = await p.ctrl.chooseCards(g, p, { prompt: LX('Like Warm Rain: escolhe a Direwolf a ajoelhar', 'Like Warm Rain: choose a Direwolf to kneel'), cands: w, min: 1, max: 1, ai: x => -g.str(x) }); d.kneel = true; const t = ch.attackers.filter(c => c.zone === 'chars'); const [k] = await p.ctrl.chooseCards(g, p, { prompt: LX('Like Warm Rain: escolhe o atacante a matar', 'Like Warm Rain: choose the attacker to kill'), cands: t, min: 1, max: 1, ai: x => AI.value(g, x) }); await g.kill(k); } } },
+  '01159': { pt: 'Só durante um desafio. Ação: o claim do teu plot sobe 1 até ao fim do desafio.',
+    ev: { timing: 'action', cond: (g, p, ctx) => !!g.ch && g.ch.att === p && !ctx.reaction && !g.ch.wic, ai: (g, p) => AI.wicScore(g, p),
+      run: async (g, p) => { g.ch.claimMod += 1; g.ch.wic = true; g.log('Winter Is Coming: claim +1.'); } } },
+});
+
+// ================= ENGLISH ABILITY SUMMARIES (paraphrased) =================
+const AB_EN = {
+  '01001': 'Reaction: after you win a Power challenge, take 1 power from the loser\'s faction card.',
+  '01002': 'Reaction: after you win dominance, gain 2 power for your faction.',
+  '01003': 'No player may start a Military or Power challenge without first winning an Intrigue challenge that phase.',
+  '01004': 'The first Lord or Lady character you marshal this round costs 2 less.',
+  '01005': 'You may initiate one extra Military challenge.',
+  '01006': 'When revealed: look at the top 10 cards for an attachment or location and add it to your hand. Shuffle.',
+  '01007': 'When revealed: gain 1 gold per character your opponent controls.',
+  '01008': 'When revealed: name a challenge type. When you defend in that type, the attacker\'s claim is 1 lower.',
+  '01009': 'When revealed: choose an attachment and discard it from play.',
+  '01010': 'When revealed: draw 3 cards.',
+  '01011': 'When revealed: choose a character and kneel it.',
+  '01012': 'Every character is treated as having a blank text box (Traits remain).',
+  '01013': 'When revealed: opponent discards a random card from hand. If it is a character, it goes to the dead pile and you gain 2 power.',
+  '01014': 'Each player may declare only 1 attacker or defender per challenge.',
+  '01015': 'When revealed: each player picks one of their characters and discards it (cannot be saved).',
+  '01016': 'You cannot marshal locations or attachments, or play events.',
+  '01017': 'Revealed Kingdom and Edict plots have a base gold value of 0.',
+  '01018': 'When revealed: place 1 token. Action: spend it to stand a character.',
+  '01019': 'When revealed: shuffle up to 3 cards from your discard pile back into your deck.',
+  '01020': 'When revealed: put a character with printed cost 5 or less from your hand or discard pile into play.',
+  '01021': 'You may initiate only 1 challenge this phase.',
+  '01022': 'When revealed: look at the top 10 cards for a character and add it to your hand. Shuffle.',
+  '01023': 'When the challenges phase begins, every player returns their gold to the treasury.',
+  '01024': 'You may play 1 extra limited card this round.',
+  '01026': 'When revealed: each player keeps up to 3 of their characters; all others are killed (cannot be saved).',
+  '01027': 'Max 15 neutral cards. Action: kneel your faction card to make the next loyal card you play this phase cost 1 less.',
+  '01028': 'Reaction: after you marshal Littlefinger, draw 2 cards. +1 Income.',
+  '01029': 'Stealth. Interrupt: when dominance ends, remove Varys from the game to discard every character.',
+  '01030': 'No attachments. Reaction: after winning a challenge where it attacked, discard an attachment the loser controls.',
+  '01031': 'No attachments. Pillage. Challenges action: kneel your faction card to give a participating Wildling you control +2 STR.',
+  '01032': 'Lord or Lady only. Action: kneel Seal of the Hand to stand the attached character.',
+  '01033': 'Lord or Lady only. Interrupt: sacrifice Bodyguard to save the attached character from being killed or discarded.',
+  '01034': 'Attached character gains an Intrigue icon.',
+  '01035': 'Terminal. The attached character\'s text box is treated as blank.',
+  '01036': 'Attached character gains a Power icon.',
+  '01037': 'Attached character gains a Military icon.',
+  '01038': 'Adds 8 STR to your dominance total. +1 Reserve.',
+  '01039': 'Limited. Marshaling action: kneel and sacrifice it so your next character costs 3 less. +1 Initiative.',
+  '01040': 'Limited. +1 Income.',
+  '01041': 'Reaction: after winning a Military challenge as attacker by 5+ STR, kill one of the loser\'s characters.',
+  '01042': 'Reaction: after winning a Military challenge as attacker by 5+ STR, discard one of the loser\'s locations.',
+  '01043': 'Reaction: after winning a Power challenge by 5+ STR, gain 2 power.',
+  '01044': 'Reaction: after winning an Intrigue challenge as attacker, poison a loser\'s character without an Intrigue icon; it dies at the end of the phase.',
+  '01045': 'Interrupt: cancel an opponent\'s event. X is that event\'s printed cost.',
+  '01084': 'While attacking in an Intrigue challenge, your plot\'s claim is raised by 1.',
+  '01086': 'Reaction: after a Lord or Lady character is killed, Joffrey gains 1 power (up to 3 times per round).',
+  '01087': 'Does not kneel when attacking in a Military challenge, and has renown while in a Military challenge.',
+  '01088': 'Dominance action: kneel to discard the top card of the opponent\'s deck, then you may discard a copy of it from play.',
+  '01089': 'Stealth. Reaction: after an Intrigue challenge is initiated, gain 2 gold (twice per round).',
+  '01090': 'Renown. +1 STR for each gold in your gold pool. +2 Income.',
+  '01092': 'Ambush (2). If it came in by ambush, it is discarded at the end of that phase (cannot be saved).',
+  '01094': 'Marshaling action: kneel so your next Lannister character costs 1 less.',
+  '01095': 'Ambush (4). Reaction: after it enters by ambush, if you hold more cards than your opponent, they must kill one of their characters.',
+  '01096': 'Ambush (1). +2 STR. On Joffrey Baratheon it also grants a Military icon.',
+  '01097': 'You may initiate one extra Intrigue challenge.',
+  '01098': 'Reaction: after you win an Intrigue challenge, draw 1 card.',
+  '01099': 'Limited. Marshaling action: kneel so your next Lannister card costs 1 less.',
+  '01100': 'Action: put a Lannister character from your hand into play; discard it at the end of the phase if still in play.',
+  '01101': 'Requires a Lannister Lord/Lady. Challenges action: kneel your faction card to return an opponent\'s character with printed cost ≤ X to hand.',
+  '01141': 'Stealth. Gains a Military icon while she has a duplicate. Reaction: on entering play, put your top deck card under her as a duplicate.',
+  '01142': 'Interrupt: sacrifice Bran to cancel an opponent\'s event.',
+  '01143': 'While she is in a challenge, your opponents cannot trigger card abilities.',
+  '01144': 'Renown. Reaction: after a challenge is initiated against you, stand Eddard Stark.',
+  '01145': 'Intimidate. No attachments. Challenges action: kneel to kill a character with STR 1 or less (2 or less if you control Robb Stark).',
+  '01146': 'Renown. Reaction: after one of your Stark characters is killed or sacrificed, stand all your characters (once per round).',
+  '01147': 'Enters play knelt. Reaction: after she stands, gain 1 power for your faction (once per round).',
+  '01148': 'No attachments. Bran Stark gains insight. Reaction: on entering, return a Stark character with printed STR ≤ 2 from your discard or dead pile to hand.',
+  '01149': 'No attachments. +1 STR for each other Direwolf you control.',
+  '01151': 'No attachments. While any War plot is revealed, does not kneel when attacking in a Military challenge.',
+  '01152': 'Marshaling action: kneel so your next Stark character costs 1 less.',
+  '01153': 'Stark character only. +2 STR. Reaction: after winning a Military challenge it took part in, sacrifice Ice to kill one of the loser\'s characters.',
+  '01154': 'Challenges action: kneel to reveal your top card; if it is Stark, draw it.',
+  '01155': 'Direwolf cards in your hand gain ambush (X), where X is their printed cost.',
+  '01156': 'Limited. Marshaling action: kneel so your next Stark card costs 1 less.',
+  '01157': 'Military challenges only. Action: a participating Stark character gets +2 STR; if you win, draw 1 card.',
+  '01158': 'Reaction: after losing an Intrigue challenge as defender, kneel a Direwolf to kill an attacking character.',
+  '01159': 'During a challenge only. Action: raise your plot\'s claim by 1 until the challenge ends.',
+};
+['01198', '01199', '01200', '01201', '01202', '01203', '01204', '01205'].forEach(c => AB_EN[c] = 'You may include non-loyal cards of the banner faction; you must include at least 12 of them.');
+function abText(code) { const a = AB[code]; if (!a) return null; return LANG === 'en' ? (AB_EN[code] || a.pt) : a.pt; }
+
+// ================= IA HEURÍSTICA =================
+const AI = {
+  value(g, c) { return (c.d.cost || 0) + (c.d.t === 'character' ? g.str(c) : 0) + 2 * c.power + (c.d.u ? 2 : 0) + c.att.length * 1.5 + c.dupes.length * 2; },
+  iconsCount(g, c) { return CH_TYPES.filter(t => g.hasIcon(c, t)).length; },
+  handValue(g, p, c) { if (c.d.t === 'event') return 3 + (c.d.cost === 'X' ? 2 : 0); return (c.d.cost || 0) + (c.d.s || 0) + (c.d.u && g.findDupeTarget(p, c) ? 4 : 0); },
+  defPotential(g, p, type, exclude = []) { // força máxima que p pode defender
+    return p.chars.filter(c => !c.kneel && g.hasIcon(c, type) && !exclude.includes(c)).reduce((s, c) => s + g.str(c), 0);
+  },
+  attPotential(g, p, type) { return p.chars.filter(c => g.canAttackWith(p, c, type)).reduce((s, c) => s + g.str(c), 0); },
+  setupScore(g, p, c, budget) {
+    if (g.findDupeTarget(p, c)) return 6;
+    if (c.d.t === 'character') return 10 + g.str(c) + (c.d.cost || 0) + AI.iconsCount(g, c) - (c.d.k?.ambush ? 3 : 0);
+    if (c.d.t === 'location') return (c.d.m?.income ? 12 : 4) + (c.d.cost || 0);
+    if (c.d.t === 'attachment') return c.code === '01035' ? (p.opp.chars.length ? 3 : -1) : (p.chars.some(t => AI.attachScore(g, p, c, t) > 0) ? 3 : -1);
+    return -1;
+  },
+  attachScore(g, p, a, t) {
+    if (a.code === '01035') return t.owner !== p ? AI.value(g, t) + (DB[t.code].v ? -5 : 3) : -50;
+    if (t.owner !== p) return -50;
+    let s = AI.value(g, t);
+    const gives = { '01034': 'intrigue', '01036': 'power', '01037': 'military' }[a.code];
+    if (gives) s += g.hasIcon(t, gives) ? -6 : 6;
+    if (a.code === '01032' || a.code === '01096' || a.code === '01153') s += g.str(t);
+    return s;
+  },
+  marshalScore(g, p, c) {
+    if (g.findDupeTarget(p, c)) return 9;
+    if (c.d.t === 'character') {
+      if (c.code === '01095') return 2; // melhor por ambush
+      return 10 + g.str(c) + AI.iconsCount(g, c) * 2 + (c.d.cost || 0) + (c.d.m?.income ? 6 : 0);
+    }
+    if (c.d.t === 'location') { if (c.d.m?.income) return 40; if (c.code === '01038') return 12; if (c.code === '01039') return 25; return 8 + (c.d.cost || 0); }
+    if (c.d.t === 'attachment') { const best = Math.max(-50, ...g.attachTargets(p, c).map(t => AI.attachScore(g, p, c, t))); return best > 0 ? 6 + Math.min(best, 8) * 0.3 : -1; }
+    return -1;
+  },
+  reducerScore(g, p, filter, amt, sac) {
+    if (g.phase !== 'marshal' || g.activeP !== p) return 0;
+    const already = p.reducers.filter(r => r.modes.includes('marshal'));
+    const want = p.hand.filter(c => filter(c) && ['character', 'location', 'attachment'].includes(c.d.t) && !g.findDupeTarget(p, c) && AI.marshalScore(g, p, c) > 0 && !g.uniqueBlockedByDead(p, c));
+    for (const c of want) {
+      const cur = g.costOf(p, c, 'marshal');
+      if (cur <= 0) continue;
+      if (cur - amt > p.gold) continue;
+      if (sac && cur < 4) continue;
+      if (already.length && already.some(r => r.f(c))) { if (cur > 0) return 60; continue; }
+      return 60;
+    }
+    return 0;
+  },
+  plotScore(g, p, pl) {
+    const [inc, ini, claim] = pl.d.p; let s = inc * 1.3 + ini * 0.15 + claim * 2 + Math.random() * 2.5;
+    const q = p.opp;
+    switch (pl.code) {
+      case '01010': s += p.hand.length < 4 ? 4 : -1; break;
+      case '01026': s += (q.chars.length - p.chars.length >= 2) ? 8 : -12; break;
+      case '01015': s += q.chars.length ? 1 : -3; break;
+      case '01020': s += [...p.hand, ...p.discard].some(c => c.d.t === 'character' && (c.d.cost || 0) >= 4 && (c.d.cost || 0) <= 5) ? 5 : -6; break;
+      case '01022': case '01006': s += 2; break;
+      case '01011': s += 2; break;
+      case '01013': s += q.hand.length > 2 ? 2 : -1; break;
+      case '01007': s += q.chars.length * 0.9; break;
+      case '01012': s -= 4; break;
+      case '01003': case '01014': s -= 1; break;
+      case '01005': s += p.chars.filter(c => g.hasIcon(c, 'military')).length * 0.5; break;
+      case '01016': s -= p.hand.filter(c => c.d.t !== 'character').length * 0.8; break;
+    }
+    if (g.round === 1) s += inc * 0.6;
+    return s;
+  },
+  challengeScore(g, p, t) {
+    const q = p.opp;
+    const myA = AI.attPotential(g, p, t);
+    const stealthers = p.chars.filter(c => g.canAttackWith(p, c, t) && g.hasKw(c, 'stealth')).length;
+    const defs = q.chars.filter(c => !c.kneel && g.hasIcon(c, t)).sort((a, b) => g.str(b) - g.str(a));
+    const D = defs.slice(stealthers).reduce((s, c) => s + g.str(c), 0);
+    if (myA <= 0) return 0;
+    const pri = { military: 3, power: 2, intrigue: 2.5 }[t];
+    if (t === 'intrigue' && !q.hand.length && !p.locs.some(l => l.code === '01098')) return D === 0 ? 4 : 0.5;
+    if (t === 'military' && !q.chars.length) return D === 0 ? 3 : 0;
+    if (D === 0) return 20 + pri;
+    if (myA > D) return 10 + pri;
+    if (myA === D) return 6 + pri;
+    return 0;
+  },
+  pickAttackers(g, p, type, cands, jousting) {
+    const q = p.opp;
+    const sorted = [...cands].sort((a, b) => g.str(b) - g.str(a));
+    if (jousting) return [sorted[0]];
+    const stealth = sorted.filter(c => g.hasKw(c, 'stealth')).length;
+    const defs = q.chars.filter(c => !c.kneel && g.hasIcon(c, type)).sort((a, b) => g.str(b) - g.str(a));
+    const D = defs.slice(stealth).reduce((s, c) => s + g.str(c), 0);
+    if (D === 0) { // um atacante basta; prefere quem não ajoelha / renown
+      const best = [...sorted].sort((a, b) => ((ab(b).noKneelAttack && ab(b).noKneelAttack(g, b, type)) ? 5 : 0) + (g.hasKw(b, 'renown') ? 3 : 0) - ((ab(a).noKneelAttack && ab(a).noKneelAttack(g, a, type)) ? 5 : 0) - (g.hasKw(a, 'renown') ? 3 : 0));
+      const r = [best[0]];
+      for (const c of sorted) if (!r.includes(c) && (g.hasKw(c, 'renown') || (ab(c).noKneelAttack && ab(c).noKneelAttack(g, c, type)))) r.push(c);
+      return r;
+    }
+    const r = []; let s = 0;
+    for (const c of sorted) { r.push(c); s += g.str(c); if (s > D) break; }
+    // incluir quem não ajoelha (grátis)
+    for (const c of sorted) if (!r.includes(c) && ab(c).noKneelAttack && ab(c).noKneelAttack(g, c, type)) r.push(c);
+    return r;
+  },
+  stealthScore(g, p, x, type) { return (!x.kneel && g.hasIcon(x, type)) ? g.str(x) + 5 : 0.1; },
+  pickDefenders(g, p, ch, dc, jousting) {
+    const A = g.sumStr(ch.attackers);
+    const sorted = [...dc].sort((a, b) => g.str(b) - g.str(a));
+    if (jousting) return g.str(sorted[0]) > A ? [sorted[0]] : [];
+    let r = [], s = 0;
+    for (const c of sorted) { r.push(c); s += g.str(c); if (s > A) break; }
+    if (s > A) {
+      // remover desnecessários (menores primeiro)
+      for (const c of [...r].reverse()) if (s - g.str(c) > A) { r = r.filter(x => x !== c); s -= g.str(c); }
+      const claimHurts = ch.type === 'military' || ch.type === 'power' || p.hand.length > 1;
+      if (claimHurts || Math.random() < 0.6) return r;
+      return [];
+    }
+    // não ganha: evitar unopposed com uma personagem barata
+    const cheap = sorted.filter(c => g.str(c) >= 1).sort((a, b) => AI.value(g, a) - AI.value(g, b))[0];
+    if (cheap && AI.value(g, cheap) < 7 && Math.random() < 0.5) return [cheap];
+    return [];
+  },
+  ambushScore(g, p, c, ctx) {
+    if (!ctx.beforeChallenge) return 0;
+    if (c.code === '01095') return (p.hand.length - 1 > p.opp.hand.length && p.opp.chars.length) ? 25 : 0;
+    if (c.d.t === 'character') return (CH_TYPES.some(t => g.challengeAllowed(p, t) || !(p.chDone[t])) && g.hasIcon(c, 'military')) ? 7 + g.str(c) : 2;
+    if (c.d.t === 'attachment') return 3;
+    return 0;
+  },
+  standScore(g, p, ctx) {
+    // levantar personagens: depois de atacar, para defender/dominance
+    if (g.phase === 'challenges' && ctx.beforeChallenge && g.activeP === p) return 4;
+    if (g.phase === 'dominance') return 6;
+    return 0;
+  },
+  pumpScore(g, p, ch, n) {
+    if (!ch) return 0;
+    const A = g.sumStr(ch.attackers), D = g.sumStr(ch.defenders);
+    if (ch.att === p) { if (A < D && A + n >= D) return 30; return A >= D && A - D < 5 && A - D + n >= 5 ? 8 : 0; }
+    if (D <= A && D + n > A) return 30;
+    return 0;
+  },
+  wicScore(g, p) { const ch = g.ch; if (!ch) return 0; const A = g.sumStr(ch.attackers), D = g.sumStr(ch.defenders); return A >= D && A > 0 ? 15 : 0; },
+  hmrScore(g, p, ctx) {
+    if (g.phase === 'challenges' && ctx.beforeChallenge) { const best = p.hand.filter(c => c.d.t === 'character' && c.d.f === 'lannister').map(c => g.str(c)).sort((a, b) => b - a)[0] || 0; return best >= 4 && CH_TYPES.some(t => g.challengeAllowed(p, t)) ? 9 : 0; }
+    return 0;
+  },
+  tidflScore(g, p) {
+    const t = p.opp.chars.filter(c => (c.d.cost || 0) <= p.gold && (c.d.cost || 0) >= 4);
+    return t.length ? 12 : 0;
+  },
+  greyWindScore(g, p, gw, targets, ctx) {
+    const enemy = targets.filter(x => x.owner !== p);
+    if (!enemy.length) return 0;
+    const best = Math.max(...enemy.map(x => AI.value(g, x)));
+    if (ctx.ch) return enemy.some(x => participating(g, x) && x.owner === ctx.ch.att) ? 20 : 0;
+    if (ctx.beforeChallenge && g.activeP === p) return (p.chDone.military || !g.challengeAllowed(p, 'military')) ? 10 + best : (best >= 6 ? 8 : 0);
+    return 0;
+  },
+  cancelScore(g, q, ev) { return ev.owner !== q ? 5 + (ev.d.cost || 0) : 0; },
+  varysScore(g, p) {
+    const mine = p.chars.filter(c => c.code !== '01029').reduce((s, c) => s + AI.value(g, c), 0);
+    const theirs = p.opp.chars.reduce((s, c) => s + AI.value(g, c), 0);
+    return theirs > mine + 10 ? 1 : 0;
+  },
+};
+
+class AICtrl {
+  constructor(delay) { this.delay = delay || 0; this.isAI = true; }
+  async wait() { if (this.delay) await sleep(this.delay); }
+  async chooseCards(g, p, o) {
+    await this.wait();
+    if (o.aiPick) return o.aiPick();
+    const sc = o.cands.map(c => ({ c, s: o.ai ? o.ai(c) : 1 })).sort((a, b) => b.s - a.s);
+    const r = [];
+    for (const x of sc) { if (r.length >= o.max) break; if (r.length < o.min || x.s > 0) r.push(x.c); }
+    return r;
+  }
+  async chooseOption(g, p, o) {
+    await this.wait();
+    let best = o.options[0], bs = -Infinity;
+    for (const op of o.options) { const s = o.ai ? o.ai(op) : 0; if (s > bs) { bs = s; best = op; } }
+    return best.value;
+  }
+  async actionWindow(g, p, o) {
+    const items = [];
+    for (const a of o.actions || []) items.push({ a, s: typeof a.ai === 'number' ? a.ai : 0 });
+    for (const b of o.buttons || []) items.push({ b, s: b.ai || 0 });
+    items.sort((x, y) => y.s - x.s);
+    const top = items[0];
+    if (!top || top.s <= 0) return null;
+    await this.wait();
+    if (top.a) return top.a;
+    return { button: top.b.value };
+  }
+}
+
+// ================= DECKS: iniciais, validação, importação =================
+const byName = n => NAME_IDX[n.toLowerCase()];
+function mkDeck(name, faction, agenda, list) { const cards = {}; for (const [n, q] of list) { const c = byName(n); if (!c) throw new Error('Carta desconhecida: ' + n); cards[c] = (cards[c] || 0) + q; } return { name, faction, agenda, cards, starter: true }; }
+const STARTER_DECKS = [
+  mkDeck('Core — Stark (Fealty)', 'stark', '01027', [
+    ['A Clash of Kings', 1], ['A Storm of Swords', 1], ['Calling the Banners', 1], ['Counting Coppers', 1], ['Filthy Accusations', 1], ['Marching Orders', 1], ['Summons', 1],
+    ['Eddard Stark', 3], ['Robb Stark', 2], ['Catelyn Stark', 2], ['Arya Stark', 2], ['Bran Stark', 2], ['Sansa Stark', 2], ['Grey Wind', 2], ['Summer', 2], ['Direwolf Pup', 3], ['Tumblestone Knight', 3], ['Vanguard of the North', 3], ['Winterfell Steward', 3],
+    ['Gates of Winterfell', 2], ['The Wolfswood', 1], ['Heart Tree Grove', 3], ['Ice', 2], ['For the North!', 3], ['Like Warm Rain', 2], ['Winter Is Coming', 3],
+    ['Littlefinger', 2], ['The Kingsroad', 3], ['The Roseroad', 3], ['The Iron Throne', 1], ['Bodyguard', 2], ['Noble Lineage', 2], ['Seal of the Hand', 1], ['Put to the Sword', 1],
+  ]),
+  mkDeck('Core — Lannister (Fealty)', 'lannister', '01027', [
+    ['A Clash of Kings', 1], ['A Noble Cause', 1], ['Heads on Spikes', 1], ['Sneak Attack', 1], ['Taxation', 1], ['Building Orders', 1], ['Reinforcements', 1],
+    ['Tywin Lannister', 3], ['Ser Jaime Lannister', 3], ['Tyrion Lannister', 3], ['Cersei Lannister', 2], ['Grand Maester Pycelle', 2], ['Joffrey Baratheon', 2], ['The Tickler', 2], ['Burned Men', 3], ['Gold Cloaks', 3], ['Lannisport Moneylender', 3], ['Lannisport Merchant', 3], ["The Queen's Assassin", 2],
+    ['Casterly Rock', 2], ['Lannisport', 2], ['Western Fiefdom', 3], ["Widow's Wail", 2], ['Hear Me Roar!', 3], ['The Things I Do For Love', 2],
+    ['Littlefinger', 2], ['The Kingsroad', 3], ['The Roseroad', 3], ['The Iron Throne', 1], ['Seal of the Hand', 2], ['Bodyguard', 2], ['Superior Claim', 1], ['Put to the Sword', 1],
+  ]),
+];
+const BANNER_FACTION = { '01198': 'baratheon', '01199': 'greyjoy', '01200': 'lannister', '01201': 'martell', '01202': 'thenightswatch', '01203': 'stark', '01204': 'targaryen', '01205': 'tyrell' };
+
+function deckStats(dk) {
+  let plots = 0, draw = 0, neutral = 0, banner = 0; const notAuto = [];
+  for (const [c, n] of Object.entries(dk.cards)) {
+    const d = DB[c]; if (!d) continue;
+    if (d.t === 'plot') plots += n; else if (d.t !== 'agenda') { draw += n; if (d.f === 'neutral') neutral += n; if (dk.agenda && BANNER_FACTION[dk.agenda] === d.f) banner += n; }
+    if (!isAuto(c) && d.t !== 'agenda') notAuto.push(d.n);
+  }
+  return { plots, draw, neutral, banner, notAuto };
+}
+function validateDeck(dk) {
+  const errs = []; const s = deckStats(dk);
+  if (s.plots !== 7) errs.push(LX(`Precisa de exatamente 7 plots (tem ${s.plots}).`, `Needs exactly 7 plots (has ${s.plots}).`));
+  if (s.draw < 60) errs.push(LX(`Precisa de pelo menos 60 cartas de baralho (tem ${s.draw}).`, `Needs at least 60 draw cards (has ${s.draw}).`));
+  for (const [c, n] of Object.entries(dk.cards)) {
+    const d = DB[c]; if (!d) continue;
+    if (n > d.lim) errs.push(LX(`${d.n}: máximo ${d.lim} cópias.`, `${d.n}: at most ${d.lim} copies.`));
+    if (d.t === 'agenda') continue;
+    const bannerOk = dk.agenda && BANNER_FACTION[dk.agenda] === d.f && !d.l;
+    if (d.f !== 'neutral' && d.f !== dk.faction && !bannerOk) errs.push(LX(`${d.n} não pertence à facção ${FACTION_NAMES[dk.faction]}.`, `${d.n} is not in the ${FACTION_NAMES[dk.faction]} faction.`));
+  }
+  if (dk.agenda === '01027' && s.neutral > 15) errs.push(LX(`Fealty: máximo 15 cartas neutras (tem ${s.neutral}).`, `Fealty: at most 15 neutral cards (has ${s.neutral}).`));
+  if (dk.agenda && BANNER_FACTION[dk.agenda]) { if (BANNER_FACTION[dk.agenda] === dk.faction) errs.push(LX('O estandarte não pode ser da tua própria facção.', 'The banner cannot be your own faction.')); if (s.banner < 12) errs.push(LX(`Estandarte: pelo menos 12 cartas de ${FACTION_NAMES[BANNER_FACTION[dk.agenda]]} (tem ${s.banner}).`, `Banner: at least 12 ${FACTION_NAMES[BANNER_FACTION[dk.agenda]]} cards (has ${s.banner}).`)); }
+  return errs;
+}
+// Importação: texto do ThronesDB (Download → Text) ou JSON da API pública
+const FACTION_ALIASES = { 'house baratheon': 'baratheon', 'baratheon': 'baratheon', 'house greyjoy': 'greyjoy', 'greyjoy': 'greyjoy', 'house lannister': 'lannister', 'lannister': 'lannister', 'house martell': 'martell', 'martell': 'martell', "the night's watch": 'thenightswatch', "night's watch": 'thenightswatch', 'house stark': 'stark', 'stark': 'stark', 'house targaryen': 'targaryen', 'targaryen': 'targaryen', 'house tyrell': 'tyrell', 'tyrell': 'tyrell' };
+function importDeck(text) {
+  text = text.trim(); const missing = []; let dk;
+  if (text.startsWith('{')) {
+    const j = JSON.parse(text);
+    dk = { name: j.name || LX('Deck importado', 'Imported deck'), faction: j.faction_code, agenda: null, cards: {} };
+    const slots = j.slots || {};
+    const ag = j.agendas ? (Array.isArray(j.agendas) ? j.agendas : Object.keys(j.agendas)) : (j.agenda_code ? [j.agenda_code] : []);
+    for (const a of ag) { const code = typeof a === 'string' ? a : a.code; if (DB[code]) dk.agenda = code; else missing.push(`agenda ${code}`); }
+    for (const [code, n] of Object.entries(slots)) { if (DB[code] && DB[code].t === 'agenda') { dk.agenda = code; continue; } if (DB[code]) dk.cards[code] = n; else missing.push(`${n}x ${code}`); }
+  } else {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    dk = { name: lines[0] || LX('Deck importado', 'Imported deck'), faction: null, agenda: null, cards: {} };
+    for (const l of lines) {
+      const low = l.toLowerCase();
+      if (!dk.faction && FACTION_ALIASES[low]) { dk.faction = FACTION_ALIASES[low]; continue; }
+      const m = l.match(/^(\d+)\s*x?\s+(.+?)(\s+\([^)]*\))?$/i);
+      if (m) { const n = +m[1]; const nm = m[2].trim(); const c = byName(nm); if (c) { if (DB[c].t === 'agenda') dk.agenda = c; else dk.cards[c] = (dk.cards[c] || 0) + n; } else missing.push(`${n}x ${nm}`); continue; }
+      const c = byName(l.replace(/\s+\([^)]*\)$/, '')); if (c && DB[c].t === 'agenda') dk.agenda = c;
+    }
+    if (!dk.faction) { const cnt = {}; for (const [c, n] of Object.entries(dk.cards)) if (DB[c].f !== 'neutral') cnt[DB[c].f] = (cnt[DB[c].f] || 0) + n; dk.faction = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'stark'; }
+  }
+  if (!FACTION_NAMES[dk.faction] || dk.faction === 'neutral') dk.faction = 'stark';
+  return { deck: dk, missing };
+}
+function exportDeckText(dk) {
+  const groups = { plot: 'Plots', character: 'Characters', location: 'Locations', attachment: 'Attachments', event: 'Events' };
+  let s = `${dk.name}\n\nHouse ${FACTION_NAMES[dk.faction]}\n${dk.agenda ? DB[dk.agenda].n + '\n' : ''}`;
+  for (const [t, label] of Object.entries(groups)) {
+    const items = Object.entries(dk.cards).filter(([c]) => DB[c] && DB[c].t === t).sort((a, b) => DB[a[0]].n.localeCompare(DB[b[0]].n));
+    if (!items.length) continue;
+    s += `\n${label} (${items.reduce((x, [, n]) => x + n, 0)}):\n` + items.map(([c, n]) => `${n}x ${DB[c].n} (Core Set)`).join('\n') + '\n';
+  }
+  return s;
+}
+
+// ================= INTERFACE (PT / EN) =================
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const TYPE_PT = i18nObj({ character: 'Personagem', location: 'Local', attachment: 'Anexo', event: 'Evento', plot: 'Plot', agenda: 'Agenda' },
+  { character: 'Character', location: 'Location', attachment: 'Attachment', event: 'Event', plot: 'Plot', agenda: 'Agenda' });
+const KW_PT = i18nObj({ renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'Sem anexos', terminal: 'Terminal' },
+  { renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'No attachments', terminal: 'Terminal' });
+const store = {
+  get(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
+};
+
+// ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
+const PACK_CGDB = { '01': 1 };
+const IMG = {
+  on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
+  urls(code) {
+    const u = [`https://thronesdb.com/bundles/cards/${code}.png`];
+    const cg = PACK_CGDB[code.slice(0, 2)];
+    if (cg) u.push(`https://lcg-cdn.fantasyflightgames.com/got2nd/GT${String(cg).padStart(2, '0')}_${parseInt(code.slice(2), 10)}.jpg`);
+    return u;
+  },
+  tag(code, cls) {
+    if (!this.on || this.broken.has(code)) return '';
+    const g = this.good.get(code);
+    return `<img class="${cls || 'cimg'}${g != null ? ' ok' : ''}" src="${this.urls(code)[g || 0]}" data-img="${code}" data-try="${g || 0}" alt="" onload="imgOk(this)" onerror="imgFail(this)">`;
+  },
+};
+function imgOk(el) { IMG.oks++; IMG.good.set(el.dataset.img, +el.dataset.try); el.classList.add('ok'); el.parentElement && el.parentElement.classList.add('hasimg'); }
+function imgFail(el) {
+  const code = el.dataset.img, i = +el.dataset.try + 1, u = IMG.urls(code);
+  if (i < u.length) { el.dataset.try = i; el.src = u[i]; return; }
+  IMG.broken.add(code); IMG.fails++; el.remove();
+  if (IMG.fails >= 6 && IMG.oks === 0 && !IMG.warned) { IMG.warned = true; UI.toast(LX('As imagens das cartas não carregam aqui (esta página bloqueia imagens externas). Usa o ficheiro HTML descarregado para ver as imagens do ThronesDB.', 'Card images cannot load here (this page blocks external images). Use the downloaded HTML file to see ThronesDB images.')); }
+}
+
+// ---------- desenho das cartas ----------
+function iconsHTML(str) { return [...(str || '')].map(L => `<span class="ic ${L}">${L}</span>`).join(''); }
+function kwList(d, inst, g) {
+  const out = [];
+  for (const k of ['renown', 'stealth', 'insight', 'intimidate', 'pillage', 'limited', 'terminal']) if (inst && g ? g.hasKw(inst, k) : d.k?.[k]) out.push(KW_PT[k]);
+  if (d.k?.ambush != null) out.push(`Ambush(${d.k.ambush})`);
+  if (d.m) for (const [k, v] of Object.entries(d.m)) out.push(`${v > 0 ? '+' : ''}${v} ${LX({ income: 'Ouro', initiative: 'Inic.', reserve: 'Res.' }, { income: 'Gold', initiative: 'Init.', reserve: 'Res.' })[k]}`);
+  return out;
+}
+function cardHTML(d, inst, opts = {}) {
+  const g = UI.game;
+  const fc = `--fc:var(--f-${d.f})`;
+  const cls = ['card', 'fac-' + d.f, ...(opts.cls || [])];
+  const uid = inst ? `data-uid="${inst.uid}"` : `data-code="${d.c}"`;
+  const img = IMG.tag(d.c);
+  if (img && IMG.good.has(d.c)) cls.push('hasimg');
+  if (d.t === 'plot') {
+    return `<div class="${cls.join(' ')} plotc" style="${fc}" ${uid}><div class="hd" style="padding-left:4px">${esc(d.n)}</div><div class="body"><div class="ty">Plot · ${esc(d.tr.join('. '))}</div>${isAuto(d.c) ? '' : '<div class="warn">⚠</div>'}</div><div class="pst"><span title="Gold">💰${d.p[0]}</span><span title="Initiative">⚡${d.p[1]}</span><span title="Claim">⚔${d.p[2]}</span><span title="Reserve">✋${d.p[3]}</span></div>${img}</div>`;
+  }
+  let s = '', ic = d.i || '', ov = '';
+  if (d.t === 'character') {
+    let v = d.s, c2 = '';
+    if (inst && g && inst.zone === 'chars') {
+      v = g.str(inst); c2 = v > d.s ? 'up' : v < d.s ? 'down' : '';
+      ic = CH_TYPES.filter(t => g.hasIcon(inst, t)).map(t => ICON_OF[t]).join('');
+      if (g.blank(inst)) cls.push('blank');
+      if (c2) ov += `<span class="ovstr ${c2}" title="STR">${v}</span>`;
+      const gained = [...ic].filter(L => !(d.i || '').includes(L)).join('');
+      if (gained) ov += `<span class="ovic">${iconsHTML(gained)}</span>`;
+    }
+    s = `<div class="str ${c2}">${v}</div><div class="icons">${iconsHTML(ic)}</div>`;
+  }
+  const kws = kwList(d, inst && inst.zone === 'chars' ? inst : null, g);
+  let badges = '';
+  if (inst) { if (inst.power) badges += `<span class="tok pow" title="Power">${inst.power}</span>`; if (inst.dupes.length) badges += `<span class="tok dup" title="Duplicates">+${inst.dupes.length}</span>`; }
+  const mid = d.t !== 'character' ? `<div class="mid">${esc(d.tr.join('. '))}</div>` : '';
+  return `<div class="${cls.join(' ')}" style="${fc}" ${uid}>
+    ${d.cost != null ? `<div class="cost">${d.cost}</div>` : ''}<div class="hd">${d.u ? '◆ ' : ''}${esc(d.n)}</div>
+    <div class="body"><div class="ty">${TYPE_PT[d.t]}${d.l ? ' · Loyal' : ''}</div>${d.t === 'character' ? `<div class="tr" style="padding-left:18px">${esc(d.tr.join('. '))}</div>` : ''}</div>
+    ${mid}${s}<div class="kw" ${d.t !== 'character' ? 'style="left:3px"' : ''}>${esc(kws.join(' · '))}</div>
+    ${img}<div class="ov">${ov}</div>
+    ${isAuto(d.c) ? '' : `<div class="warn" title="${LX('Habilidade ainda não automatizada', 'Ability not automated yet')}">⚠</div>`}
+    <div class="badges">${badges}</div></div>`;
+}
+function previewHTML(d, inst) {
+  const g = UI.game;
+  let h = IMG.tag(d.c, 'pvimg' + (d.t === 'plot' ? ' plot' : ''));
+  h += `<div class="pv-name">${d.u ? '◆ ' : ''}${esc(d.n)}</div><div class="pv-meta"><span class="fdot" style="--fc:var(--f-${d.f})"></span>${FACTION_NAMES[d.f]} · ${TYPE_PT[d.t]}${d.l ? ' · Loyal' : ''}</div>`;
+  if (d.t === 'plot') h += `<div class="pv-row"><span class="stat g">${LX('Ouro', 'Gold')} ${d.p[0]}</span><span class="stat">${LX('Iniciativa', 'Initiative')} ${d.p[1]}</span><span class="stat">Claim ${d.p[2]}</span><span class="stat">Reserve ${d.p[3]}</span></div>`;
+  else {
+    const row = [];
+    if (d.cost != null) row.push(`<span class="stat g">${LX('Custo', 'Cost')} ${d.cost}</span>`);
+    if (d.t === 'character') { const v = inst && g && inst.zone === 'chars' ? g.str(inst) : d.s; row.push(`<span class="stat">STR ${v}${v !== d.s ? ` (base ${d.s})` : ''}</span>`); const ic = inst && g && inst.zone === 'chars' ? CH_TYPES.filter(t => g.hasIcon(inst, t)).map(t => ICON_OF[t]).join('') : d.i; row.push(iconsHTML(ic)); }
+    if (inst && inst.power) row.push(`<span class="stat p">${LX('Poder', 'Power')} ${inst.power}</span>`);
+    h += `<div class="pv-row">${row.join('')}</div>`;
+  }
+  if (d.tr.length) h += `<div><i>${esc(d.tr.join('. '))}.</i></div>`;
+  const kws = kwList(d, inst && inst.zone === 'chars' ? inst : null, g);
+  if (kws.length) h += `<div class="pv-row"><b>${esc(kws.join(' · '))}</b></div>`;
+  const a = abText(d.c);
+  if (a) h += `<div class="pv-txt">${esc(a)}</div>`;
+  else if (d.v) h += `<div class="pv-txt">${kws.length ? LX('Só keywords/modificadores — totalmente automatizada.', 'Keywords/modifiers only — fully automated.') : LX('Sem texto de habilidade.', 'No ability text.')}</div>`;
+  else h += `<div class="pv-txt pv-warn">${LX('⚠ Habilidade ainda não automatizada: a carta joga apenas com custo, STR, ícones e keywords.', '⚠ Ability not automated yet: the card plays with cost, STR, icons and keywords only.')}</div>`;
+  if (inst) {
+    if (inst.att && inst.att.length) h += `<div class="pv-row">${LX('Anexos', 'Attachments')}: ${inst.att.map(x => esc(x.d.n)).join(', ')}</div>`;
+    if (inst.kneel) h += `<div class="pv-row" style="color:var(--dim)">${LX('Ajoelhada', 'Knelt')}</div>`;
+    if (inst.flags && inst.flags.poison) h += `<div class="pv-row" style="color:#9f9">☠ ${LX('Envenenada', 'Poisoned')}</div>`;
+  }
+  h += `<div class="pv-row"><a href="https://thronesdb.com/card/${d.c}" target="_blank" rel="noopener" class="note">ThronesDB ↗</a></div>`;
+  return h;
+}
+function showPreview(d, inst) { const h = previewHTML(d, inst); document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = h); }
+
+// ---------- controlador humano ----------
+class HumanCtrl {
+  constructor() { this.isAI = false; }
+  chooseCards(g, p, o) {
+    if (!o.cands.length) return Promise.resolve([]);
+    if (o.cands.length <= o.min) return Promise.resolve([...o.cands]);
+    return new Promise(res => UI.setPending({ kind: 'select', ...o, sel: [], resolve: res }));
+  }
+  chooseOption(g, p, o) { return new Promise(res => UI.setPending({ kind: 'option', ...o, resolve: res })); }
+  actionWindow(g, p, o) { return new Promise(res => UI.setPending({ kind: 'action', ...o, resolve: res })); }
+}
+
+const UI = {
+  game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play',
+  decks: [], cur: null, curIdx: -1,
+  filt: { type: 'character', fac: 'mine', q: '', auto: false },
+  init() {
+    this.decks = store.get('agot_decks', []);
+    document.querySelectorAll('header nav button').forEach(b => b.onclick = () => this.tab(b.dataset.t));
+    document.addEventListener('mouseover', e => {
+      const u = e.target.closest('[data-uid]'); if (u) { const c = this.cardMap.get(+u.dataset.uid); if (c) showPreview(c.d, c); return; }
+      const k = e.target.closest('[data-code]'); if (k && DB[k.dataset.code]) showPreview(DB[k.dataset.code], null);
+    });
+    document.addEventListener('click', e => { const m = document.querySelector('.menu'); if (m && !m.contains(e.target)) m.remove(); }, true);
+    $('#langBtn').onclick = () => this.setLang(LANG === 'pt' ? 'en' : 'pt');
+    $('#imgBtn').onclick = () => { IMG.on = !IMG.on; store.set('agot_img', IMG.on); this.refreshAll(); };
+    this.selectDeck(0, true);
+    this.refreshAll();
+    this.tab('play');
+  },
+  setLang(l) { LANG = l; try { localStorage.setItem('agot_lang', l); } catch (e) { } this.refreshAll(); },
+  refreshAll() {
+    document.documentElement.lang = LANG;
+    $('#langBtn').textContent = LANG === 'pt' ? 'EN' : 'PT';
+    $('#langBtn').title = LX('Switch to English', 'Mudar para português');
+    $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
+    const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
+    document.querySelectorAll('header nav button').forEach(b => b.textContent = nav[b.dataset.t]);
+    $('#tagline').textContent = LX('Protótipo · Core Set · contra IA', 'Prototype · Core Set · vs AI');
+    document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = `<span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span>`);
+    this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
+    if (this.game) this.render();
+  },
+  toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 9000); t.onclick = () => t.remove(); },
+  tab(t) {
+    this.curTab = t;
+    document.querySelectorAll('header nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+    if (t === 'play') { (this.game ? $('#game') : $('#lobby')).classList.add('on'); if (!this.game) this.renderLobby(); }
+    else $('#' + t).classList.add('on');
+    if (t === 'decks') this.renderDeckList();
+  },
+  allDecks() { return [...STARTER_DECKS, ...this.decks]; },
+  // ---------- lobby ----------
+  renderLobby() {
+    const prevMe = $('#lbMe') ? $('#lbMe').value : null, prevAi = $('#lbAi') ? $('#lbAi').value : null;
+    const opts = this.allDecks().map((d, i) => { const v = validateDeck(d).length === 0; return `<option value="${i}">${esc(d.name)}${v ? '' : LX(' (inválido)', ' (invalid)')}</option>`; }).join('');
+    $('#lobby').innerHTML = `<div class="wrap"><div class="lobby">
+      <div class="panel"><h2>${LX('Nova partida contra a IA', 'New game against the AI')}</h2>
+      <label>${LX('O teu deck', 'Your deck')}</label><select id="lbMe">${opts}</select>
+      <label>${LX('Deck da IA', "AI's deck")}</label><select id="lbAi">${opts}</select>
+      <label>${LX('Velocidade da IA', 'AI speed')}</label><select id="lbSpd"><option value="700">${LX('Lenta', 'Slow')}</option><option value="350" selected>Normal</option><option value="80">${LX('Rápida', 'Fast')}</option></select>
+      <div style="margin-top:14px;display:flex;gap:8px"><button class="pri" id="lbGo">${LX('Começar partida', 'Start game')}</button></div>
+      <p class="note" id="lbMsg"></p></div>
+      <div class="panel"><h2>${LX('Como jogar', 'How to play')}</h2><div class="note">${LX(
+      'A barra dourada por cima da tua mão diz sempre o que tens de fazer. Cartas com contorno <b style="color:#46d06a">verde</b> podem ser escolhidas ou ativadas — clica nelas. Passa o rato por cima de qualquer carta para ver os detalhes à direita.<br>Tudo é automático: rendimento, iniciativa, claim, keywords (renown, insight, intimidate, pillage, stealth), dominance, reserve e as habilidades das cartas automatizadas. Cartas marcadas com ⚠ ainda não têm a habilidade programada.',
+      'The gold bar above your hand always tells you what to do. Cards outlined in <b style="color:#46d06a">green</b> can be chosen or used — click them. Hover over any card to see its details on the right.<br>Everything is automated: income, initiative, claim, keywords (renown, insight, intimidate, pillage, stealth), dominance, reserve and the abilities of automated cards. Cards marked ⚠ do not have their ability programmed yet.')}</div></div>
+    </div></div>`;
+    $('#lbMe').value = prevMe ?? '0'; $('#lbAi').value = prevAi ?? String(Math.min(1, this.allDecks().length - 1));
+    if (!$('#lbMe').value) $('#lbMe').value = '0'; if (!$('#lbAi').value) $('#lbAi').value = '0';
+    $('#lbGo').onclick = () => {
+      const a = this.allDecks()[+$('#lbMe').value], b = this.allDecks()[+$('#lbAi').value];
+      const ea = validateDeck(a), eb = validateDeck(b);
+      if (ea.length || eb.length) { $('#lbMsg').innerHTML = `<span style="color:#ff9c90">${LX('Deck inválido', 'Invalid deck')}: ${esc([...ea, ...eb][0])}</span>`; return; }
+      this.startGame(a, b, +$('#lbSpd').value);
+    };
+  },
+  startGame(da, db, delay) {
+    this.pending = null;
+    const you = LX('tu', 'you'), ai = LX('IA', 'AI');
+    const g = new Game([da, db], [new HumanCtrl(), new AICtrl(delay)], [`${FACTION_NAMES[da.faction]} (${you})`, `${FACTION_NAMES[db.faction]} (${ai})`]);
+    this.game = g; this.me = g.players[0];
+    g.onUpdate = () => this.schedule();
+    this.tab('play');
+    this.render();
+    g.run().then(w => { if (this.game !== g) return; this.render(); this.modal(`<div class="overlay-win">${w === this.me ? LX('🏆 Vitória!', '🏆 Victory!') : LX('Derrota', 'Defeat')}</div><p style="text-align:center">${esc(g.logs.filter(l => l.cls === 'win').pop()?.msg || '')}</p>`, [{ label: LX('Nova partida', 'New game'), pri: true, fn: () => { this.game = null; this.tab('play'); } }, { label: LX('Ver tabuleiro', 'View board') }], LX('Fim da partida', 'Game over')); })
+      .catch(e => { console.error(e); this.modal(`<p>${LX('Ocorreu um erro no motor de jogo:', 'The game engine hit an error:')}</p><pre style="white-space:pre-wrap;color:#ff9c90">${esc(e.stack || e)}</pre>`, [{ label: 'OK' }], LX('Erro', 'Error')); });
+  },
+  schedule() { if (this.rq) return; this.rq = true; requestAnimationFrame(() => { this.rq = false; this.render(); }); },
+  setPending(p) { this.pending = p; this.render(); },
+  resolve(v) { const p = this.pending; this.pending = null; const m = document.querySelector('.modal.sel-modal'); if (m) m.remove(); p.resolve(v); this.render(); },
+  // ---------- render jogo ----------
+  render() {
+    const g = this.game; if (!g) return;
+    const me = this.me, op = me.opp, P = this.pending;
+    this.cardMap = new Map();
+    const reg = c => { this.cardMap.set(c.uid, c); };
+    const candSet = new Set(), selSet = new Set(), actMap = new Map();
+    if (P && P.kind === 'select') { P.cands.forEach(c => candSet.add(c.uid)); P.sel.forEach(c => selSet.add(c.uid)); }
+    if (P && P.kind === 'action') for (const a of P.actions) if (a.card) { if (!actMap.has(a.card.uid)) actMap.set(a.card.uid, []); actMap.get(a.card.uid).push(a); }
+    const ch = g.ch;
+    const deco = c => { const cl = []; if (selSet.has(c.uid)) cl.push('sel'); else if (candSet.has(c.uid)) cl.push('cand'); else if (actMap.has(c.uid)) cl.push('act'); if (ch && ch.attackers.includes(c)) cl.push('atk'); if (ch && ch.defenders.includes(c)) cl.push('def'); return cl; };
+    const slot = c => {
+      reg(c); c.att.forEach(reg); c.dupes.forEach(reg);
+      const atts = c.att.map(a => `<div class="attc ${a.kneel ? 'kn' : ''} ${deco(a).join(' ')}" data-uid="${a.uid}">📎 ${esc(a.d.n)}</div>`).join('');
+      return `<div class="slot ${c.kneel ? 'kneel' : ''}">${cardHTML(c.d, c, { cls: deco(c) })}<div class="atts">${atts}</div></div>`;
+    };
+    const visible = new Set();
+    [...me.chars, ...me.locs, ...op.chars, ...op.locs, ...me.hand].forEach(c => { visible.add(c.uid); c.att.forEach(a => visible.add(a.uid)); });
+    const pp = (p, mine) => {
+      const plot = p.plot ? (reg(p.plot), cardHTML(p.plot.d, p.plot)) : `<span class="note">${LX('Sem plot revelado', 'No plot revealed')}</span>`;
+      return `<div class="pp ${mine ? 'me' : ''}"><div class="nm"><span>${esc(p.name)}${g.first === p ? ` <small title="${LX('Primeiro jogador', 'First player')}" style="font-size:11px;color:#ffd36a">★1º</small>` : ''}</span><span class="fbadge f-${p.faction} ${p.fknelt ? 'kn' : ''}" style="--fc:var(--f-${p.faction})">${FACTION_NAMES[p.faction]}</span></div>
+      <div class="stats"><span class="stat p" title="${LX('Poder total', 'Total power')}">⚑ ${g.totalPower(p)}/15</span><span class="stat g" title="${LX('Ouro', 'Gold')}">💰 ${p.gold}</span><span class="stat" title="${LX('Mão', 'Hand')}">✋ ${p.hand.length}</span>${p.agenda ? `<span class="stat" data-code="${p.agenda}">${esc(DB[p.agenda].n)}</span>` : ''}</div>
+      <div class="piles"><button data-pile="deck" data-p="${p.i}">${LX('Baralho', 'Deck')} ${p.deck.length}</button><button data-pile="discard" data-p="${p.i}">${LX('Descarte', 'Discard')} ${p.discard.length}</button><button data-pile="dead" data-p="${p.i}">${LX('Mortos', 'Dead')} ${p.dead.length}</button><button data-pile="used" data-p="${p.i}">Plots ${p.plots.length} (${LX('usados', 'used')} ${p.used.length})</button></div>
+      <div class="mini-plot">${plot}</div></div>`;
+    };
+    $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
+    let chb = '';
+    if (ch) chb = `<div class="chb">⚔ ${CH_NAMES[ch.type]} · <span class="a">${esc(ch.att.name)} ${g.sumStr(ch.attackers)}</span> × <span class="d">${esc(ch.def.name)} ${g.sumStr(ch.defenders)}</span> · claim ${g.claimValue(ch)}</div>`;
+    $('#board').innerHTML = `
+      <div class="row locs"><span class="lbl">${LX('Locais adversário', 'Opponent locations')}</span>${op.locs.map(slot).join('')}</div>
+      <div class="row"><span class="lbl">${LX('Personagens adversário', 'Opponent characters')}</span>${op.chars.map(slot).join('')}</div>
+      <div class="divider"><div class="ln"></div>${chb}<div class="ln"></div></div>
+      <div class="row"><span class="lbl">${LX('As tuas personagens', 'Your characters')}</span>${me.chars.map(slot).join('')}</div>
+      <div class="row locs"><span class="lbl">${LX('Os teus locais', 'Your locations')}</span>${me.locs.map(slot).join('')}</div>`;
+    $('#hand').innerHTML = me.hand.map(c => { reg(c); return cardHTML(c.d, c, { cls: deco(c) }); }).join('');
+    const pr = $('#prompt');
+    if (!P) {
+      pr.innerHTML = g.phase === 'end' ? `<div class="txt">${LX('Partida terminada', 'Game over')} — ${esc(g.winner?.name || '')} ${LX('venceu', 'won')}.</div><button class="pri" id="btnNew">${LX('Nova partida', 'New game')}</button>` : `<div class="txt wait">${LX('A IA está a jogar…', 'The AI is playing…')}</div>`;
+      if ($('#btnNew')) $('#btnNew').onclick = () => { this.game = null; this.tab('play'); };
+    } else if (P.kind === 'select') {
+      const n = P.sel.length, ok = n >= P.min && n <= P.max;
+      const single = P.max === 1;
+      pr.innerHTML = `<div class="txt">${esc(P.prompt)}${P.max > 1 ? ` <span class="note">(${n} ${LX('selecionada(s)', 'selected')}; ${P.min === P.max ? P.min : `${P.min}–${P.max}`})</span>` : ''}</div>
+        ${!single || P.min === 0 ? `<button class="pri" id="btnOk" ${ok ? '' : 'disabled'}>${esc(P.doneLabel || (single && n === 0 ? LX('Nenhuma', 'None') : LX('Confirmar', 'Confirm')))}</button>` : ''}
+        ${P.max > 1 && P.cands.length > 1 ? `<button id="btnAll">${LX('Todas', 'All')}</button>` : ''}`;
+      if ($('#btnOk')) $('#btnOk').onclick = () => this.resolve(P.sel);
+      if ($('#btnAll')) $('#btnAll').onclick = () => { P.sel = P.cands.slice(0, P.max); this.render(); };
+      if (P.modal || P.cands.some(c => !visible.has(c.uid))) this.selModal(P);
+    } else if (P.kind === 'option') {
+      pr.innerHTML = `<div class="txt">${esc(P.prompt)}</div>` + P.options.map((o, i) => `<button class="${i === 0 ? 'pri' : ''}" data-opt="${i}">${esc(o.label)}</button>`).join('');
+      pr.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => this.resolve(P.options[+b.dataset.opt].value));
+      if (P.card) showPreview(P.card.d, P.card);
+    } else if (P.kind === 'action') {
+      const loose = P.actions.filter(a => !a.card || !visible.has(a.card.uid));
+      pr.innerHTML = `<div class="txt">${esc(P.prompt)}</div>` + (P.buttons || []).map((b, i) => `<button class="pri" data-btn="${i}">${esc(b.label)}</button>`).join('') + loose.map((a, i) => `<button data-loose="${i}">${esc(a.label)}</button>`).join('') + `<button data-pass="1">${esc(P.passLabel || LX('Passar', 'Pass'))}</button>`;
+      pr.querySelectorAll('[data-btn]').forEach(b => b.onclick = () => this.resolve({ button: P.buttons[+b.dataset.btn].value }));
+      pr.querySelectorAll('[data-loose]').forEach(b => b.onclick = () => this.resolve(loose[+b.dataset.loose]));
+      pr.querySelector('[data-pass]').onclick = () => this.resolve(null);
+    }
+    const lg = $('#log'); const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 40;
+    lg.innerHTML = g.logs.map(l => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('');
+    if (atBottom) lg.scrollTop = lg.scrollHeight;
+    $('#gcenter').onclick = e => this.onCardClick(e, actMap);
+    $('#gside').onclick = e => {
+      const b = e.target.closest('[data-pile]'); if (b) return this.showPile(g.players[+b.dataset.p], b.dataset.pile);
+      if (e.target.id === 'btnQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
+      this.onCardClick(e, actMap);
+    };
+  },
+  onCardClick(e, actMap) {
+    const el = e.target.closest('[data-uid]'); if (!el) return;
+    const uid = +el.dataset.uid; const c = this.cardMap.get(uid); const P = this.pending; if (!P || !c) return;
+    if (P.kind === 'select') this.toggleSel(P, c);
+    else if (P.kind === 'action') {
+      const acts = actMap.get(uid); if (!acts) return;
+      if (acts.length === 1) return this.resolve(acts[0]);
+      const m = document.createElement('div'); m.className = 'menu'; m.style.left = Math.min(e.clientX, innerWidth - 260) + 'px'; m.style.top = Math.min(e.clientY, innerHeight - 40 * acts.length - 20) + 'px';
+      acts.forEach(a => { const b = document.createElement('button'); b.textContent = a.label; b.onclick = () => { m.remove(); this.resolve(a); }; m.appendChild(b); });
+      document.body.appendChild(m);
+    }
+  },
+  toggleSel(P, c) {
+    if (!P.cands.includes(c)) return;
+    if (P.max === 1 && P.min <= 1) return this.resolve([c]);
+    const i = P.sel.indexOf(c);
+    if (i >= 0) P.sel.splice(i, 1); else if (P.sel.length < P.max) P.sel.push(c);
+    this.render();
+  },
+  selModal(P) {
+    let m = document.querySelector('.modal.sel-modal');
+    if (!m) { m = document.createElement('div'); m.className = 'modal sel-modal'; document.body.appendChild(m); }
+    P.cands.forEach(c => this.cardMap.set(c.uid, c));
+    const n = P.sel.length, ok = n >= P.min && n <= P.max;
+    m.innerHTML = `<div class="box"><h3>${esc(P.prompt)}</h3><div class="cgrid">${P.cands.map(c => cardHTML(c.d, c, { cls: [P.sel.includes(c) ? 'sel' : 'cand'] })).join('')}</div>
+      ${P.max > 1 || P.min === 0 ? `<button class="pri" id="mOk" ${ok ? '' : 'disabled'}>${P.min === 0 && n === 0 ? LX('Nenhuma', 'None') : LX('Confirmar', 'Confirm')}</button>` : ''}</div>`;
+    m.onclick = e => { const el = e.target.closest('[data-uid]'); if (el) this.toggleSel(P, this.cardMap.get(+el.dataset.uid)); if (e.target.id === 'mOk') this.resolve(P.sel); };
+  },
+  showPile(p, pile) {
+    let list = { deck: [], discard: p.discard, dead: p.dead, used: [...p.plots, ...p.used] }[pile];
+    if (pile === 'deck') return this.modal(`<p>${p.deck.length} ${LX('cartas no baralho (escondidas).', 'cards in the deck (hidden).')}</p>`, [{ label: 'OK' }], `${LX('Baralho', 'Deck')} — ${p.name}`);
+    if (pile === 'used' && p !== this.me) list = p.used;
+    list.forEach(c => this.cardMap.set(c.uid, c));
+    const title = { discard: LX('Descarte', 'Discard pile'), dead: LX('Mortos (dead pile)', 'Dead pile'), used: p === this.me ? LX('Plots (disponíveis e usados)', 'Plots (available and used)') : LX('Plots usados', 'Used plots') }[pile];
+    this.modal(`<div class="cgrid">${list.length ? list.map(c => cardHTML(c.d, c, { cls: p.used.includes(c) ? ['blank'] : [] })).join('') : `<span class="note">${LX('Vazio', 'Empty')}</span>`}</div>`, [{ label: 'OK' }], `${title} — ${p.name}`);
+  },
+  modal(html, buttons, title) {
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<div class="box">${title ? `<h3>${esc(title)}</h3>` : ''}${html}<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">${buttons.map((b, i) => `<button data-mb="${i}" class="${b.pri ? 'pri' : ''}">${esc(b.label)}</button>`).join('')}</div></div>`;
+    m.querySelectorAll('[data-mb]').forEach(b => b.onclick = () => { const f = buttons[+b.dataset.mb].fn; if (f === false) return; m.remove(); if (f) f(); });
+    m.onclick = e => { if (e.target === m) m.remove(); };
+    document.body.appendChild(m); return m;
+  },
+  // ---------- construtor de decks ----------
+  saveDecks() { store.set('agot_decks', this.decks); },
+  renderDeckList() {
+    const all = this.allDecks();
+    $('#dlist').innerHTML = `<button class="pri" id="dNew">${LX('+ Novo deck', '+ New deck')}</button><button id="dImp">${LX('⇩ Importar do ThronesDB', '⇩ Import from ThronesDB')}</button><div class="note" style="margin:6px 0 2px">Decks</div>` +
+      all.map((d, i) => `<div class="di ${i === this.curIdx ? 'on' : ''}" data-di="${i}"><span class="fdot" style="--fc:var(--f-${d.faction})"></span>${esc(d.name)}<small>${d.starter ? LX('inicial · só leitura', 'starter · read-only') : (validateDeck(d).length ? LX('inválido', 'invalid') : LX('válido', 'valid'))}</small></div>`).join('');
+    $('#dlist').onclick = e => { const it = e.target.closest('[data-di]'); if (it) this.selectDeck(+it.dataset.di); if (e.target.id === 'dNew') this.newDeck(); if (e.target.id === 'dImp') this.importModal(); };
+  },
+  selectDeck(i, quiet) { const d = this.allDecks()[i]; if (!d) return; this.curIdx = i; this.cur = JSON.parse(JSON.stringify(d)); if (quiet) return; this.renderDeckList(); this.renderPool(); this.renderDeckSide(); },
+  newDeck() { this.decks.push({ name: LX('Novo deck', 'New deck'), faction: 'stark', agenda: '01027', cards: {} }); this.saveDecks(); this.selectDeck(STARTER_DECKS.length + this.decks.length - 1); },
+  isStarter() { return this.curIdx < STARTER_DECKS.length; },
+  setQty(code, n) {
+    if (this.isStarter()) return this.modal(`<p>${LX('Os decks iniciais são só de leitura. Duplica-o para o editar.', 'Starter decks are read-only. Duplicate it to edit.')}</p>`, [{ label: LX('Duplicar', 'Duplicate'), pri: true, fn: () => this.dupDeck() }, { label: LX('Cancelar', 'Cancel') }], LX('Deck inicial', 'Starter deck'));
+    if (n) this.cur.cards[code] = n; else delete this.cur.cards[code];
+    this.commit();
+  },
+  commit() { if (this.isStarter()) return; this.decks[this.curIdx - STARTER_DECKS.length] = JSON.parse(JSON.stringify(this.cur)); this.saveDecks(); this.renderPool(); this.renderDeckSide(); this.renderDeckList(); },
+  dupDeck() { const d = JSON.parse(JSON.stringify(this.cur)); delete d.starter; d.name = d.name + LX(' (cópia)', ' (copy)'); this.decks.push(d); this.saveDecks(); this.selectDeck(STARTER_DECKS.length + this.decks.length - 1); },
+  renderPool() {
+    const f = this.filt, dk = this.cur;
+    const types = [['agenda', LX('Agendas', 'Agendas')], ['plot', 'Plots'], ['character', LX('Personagens', 'Characters')], ['location', LX('Locais', 'Locations')], ['attachment', LX('Anexos', 'Attachments')], ['event', LX('Eventos', 'Events')]];
+    const facs = [['mine', LX('Facção + neutras', 'Faction + neutral')], ['all', LX('Todas', 'All')], ...Object.keys(FACTION_NAMES).map(k => [k, FACTION_NAMES[k]])];
+    let list = CARDS.filter(d => d.t === f.type);
+    if (f.fac === 'mine') list = list.filter(d => d.f === dk.faction || d.f === 'neutral' || (dk.agenda && BANNER_FACTION[dk.agenda] === d.f && !d.l));
+    else if (f.fac !== 'all') list = list.filter(d => d.f === f.fac);
+    if (f.q) list = list.filter(d => (d.n + ' ' + d.tr.join(' ')).toLowerCase().includes(f.q.toLowerCase()));
+    if (f.auto) list = list.filter(d => isAuto(d.c));
+    list.sort((a, b) => (a.f === dk.faction ? 0 : 1) - (b.f === dk.faction ? 0 : 1) || (a.cost || 0) - (b.cost || 0) || a.n.localeCompare(b.n));
+    const isAgenda = f.type === 'agenda';
+    $('#pool').innerHTML = `<div class="filters">${types.map(([k, l]) => `<button data-ft="${k}" class="${f.type === k ? 'on' : ''}">${l}</button>`).join('')}
+      <span style="flex:1"></span><button id="viewBtn" title="${LX('Alternar vista', 'Toggle view')}">${f.grid ? LX('☰ Lista', '☰ List') : LX('▦ Imagens', '▦ Images')}</button></div>
+      <div class="filters"><select id="fFac">${facs.map(([k, l]) => `<option value="${k}" ${f.fac === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <input id="fQ" placeholder="${LX('Procurar nome ou trait…', 'Search name or trait…')}" value="${esc(f.q)}" style="flex:1;min-width:140px"><label class="note"><input type="checkbox" id="fAuto" ${f.auto ? 'checked' : ''}> ${LX('só automatizadas', 'automated only')}</label></div>
+      <div class="tbl">${f.grid ? this.poolGrid(list, isAgenda) : `<table><thead><tr><th>${LX('Nome', 'Name')}</th><th>${LX('Facção', 'Faction')}</th><th>${LX('Custo', 'Cost')}</th><th>STR</th><th>${LX('Ícones', 'Icons')}</th><th>Auto</th><th>${LX('Qtd', 'Qty')}</th></tr></thead><tbody>
+      ${list.map(d => `<tr data-code="${d.c}"><td>${d.u ? '◆ ' : ''}${esc(d.n)}${d.l ? ' <small class="note">loyal</small>' : ''}</td><td><span class="fdot" style="--fc:var(--f-${d.f})"></span>${FACTION_NAMES[d.f]}</td><td>${d.cost ?? (d.p ? '💰' + d.p[0] : '')}</td><td>${d.s ?? (d.p ? '⚡' + d.p[1] : '')}</td><td>${iconsHTML(d.i)}</td><td>${isAuto(d.c) ? '✓' : '⚠'}</td><td>${this.qtyHTML(d, isAgenda)}</td></tr>`).join('')}
+      </tbody></table>`}${list.length ? '' : `<p class="note" style="padding:10px">${LX('Nenhuma carta com estes filtros.', 'No cards match these filters.')}</p>`}</div>`;
+    $('#pool').querySelectorAll('[data-ft]').forEach(b => b.onclick = () => { f.type = b.dataset.ft; this.renderPool(); });
+    $('#viewBtn').onclick = () => { f.grid = !f.grid; this.renderPool(); };
+    $('#fFac').onchange = e => { f.fac = e.target.value; this.renderPool(); };
+    $('#fQ').oninput = e => { f.q = e.target.value; clearTimeout(this._qt); this._qt = setTimeout(() => { this.renderPool(); const i = $('#fQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+    $('#fAuto').onchange = e => { f.auto = e.target.checked; this.renderPool(); };
+    $('#pool').querySelector('.tbl').onclick = e => { const b = e.target.closest('[data-q]'); if (!b) return; const code = b.closest('[data-code]').dataset.code; const n = +b.dataset.q;
+      if (isAgenda) { if (this.isStarter()) return this.setQty(code, n); this.cur.agenda = n ? code : null; this.commit(); } else this.setQty(code, n); };
+  },
+  qtyHTML(d, isAgenda) { const dk = this.cur; const q = isAgenda ? (dk.agenda === d.c ? 1 : 0) : (dk.cards[d.c] || 0); const max = isAgenda ? 1 : d.lim; return `<span class="qty">${Array.from({ length: max + 1 }, (_, n) => `<button data-q="${n}" class="${n === q ? 'on' : ''}">${n}</button>`).join('')}</span>`; },
+  poolGrid(list, isAgenda) { return `<div class="pgrid">${list.map(d => `<div class="pcell" data-code="${d.c}">${cardHTML(d, null, { cls: d.t === 'plot' ? [] : ['big'] })}${this.qtyHTML(d, isAgenda)}</div>`).join('')}</div>`; },
+  renderDeckSide() {
+    const dk = this.cur, st = deckStats(dk), errs = validateDeck(dk), ro = this.isStarter();
+    const groups = [['plot', 'Plots'], ['character', LX('Personagens', 'Characters')], ['location', LX('Locais', 'Locations')], ['attachment', LX('Anexos', 'Attachments')], ['event', LX('Eventos', 'Events')]];
+    const facOpts = Object.keys(FACTION_NAMES).filter(k => k !== 'neutral').map(k => `<option value="${k}" ${dk.faction === k ? 'selected' : ''}>${FACTION_NAMES[k]}</option>`).join('');
+    const agOpts = `<option value="">${LX('(sem agenda)', '(no agenda)')}</option>` + CARDS.filter(d => d.t === 'agenda').map(d => `<option value="${d.c}" ${dk.agenda === d.c ? 'selected' : ''}>${esc(d.n)}</option>`).join('');
+    $('#dsideIn').innerHTML = `<input id="dName" value="${esc(dk.name)}" style="width:100%;font-weight:600" ${ro ? 'disabled' : ''}>
+      <div style="display:flex;gap:6px;margin-top:6px"><select id="dFac" style="flex:1" ${ro ? 'disabled' : ''}>${facOpts}</select><select id="dAg" style="flex:1" ${ro ? 'disabled' : ''}>${agOpts}</select></div>
+      <div class="stats"><span class="stat">Plots ${st.plots}/7</span><span class="stat">${LX('Baralho', 'Deck')} ${st.draw}/60</span><span class="stat">${LX('Neutras', 'Neutral')} ${st.neutral}</span></div>
+      <div class="valid ${errs.length ? 'bad' : 'ok'}">${errs.length ? '✖ ' + errs.map(esc).join('<br>✖ ') : LX('✔ Deck válido', '✔ Valid deck')}</div>
+      ${st.notAuto.length ? `<div class="note" style="color:#f0a35a">⚠ ${st.notAuto.length} ${LX('carta(s) sem habilidade automatizada', 'card(s) without an automated ability')}: ${esc([...new Set(st.notAuto)].join(', '))}</div>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${ro ? `<button class="pri" id="dDup">${LX('Duplicar para editar', 'Duplicate to edit')}</button>` : `<button id="dDup">${LX('Duplicar', 'Duplicate')}</button><button class="warn" id="dDel">${LX('Apagar', 'Delete')}</button>`}<button id="dExp">${LX('Exportar texto', 'Export text')}</button><button id="dPlay">${LX('Jogar com este', 'Play with this')}</button></div>
+      ${groups.map(([t, l]) => { const it = Object.entries(dk.cards).filter(([c]) => DB[c] && DB[c].t === t).sort((a, b) => (DB[a[0]].cost || 0) - (DB[b[0]].cost || 0) || DB[a[0]].n.localeCompare(DB[b[0]].n)); if (!it.length) return '';
+        return `<div class="grp"><h4>${l} (${it.reduce((s, [, n]) => s + n, 0)})</h4>${it.map(([c, n]) => `<div class="ln" data-code="${c}"><span>${n}× ${DB[c].u ? '◆ ' : ''}${esc(DB[c].n)} ${isAuto(c) ? '' : '⚠'}</span><span class="note">${DB[c].cost ?? ''}</span></div>`).join('')}</div>`; }).join('')}`;
+    if (!ro) {
+      $('#dName').onchange = e => { dk.name = e.target.value || '—'; this.commit(); };
+      $('#dFac').onchange = e => { dk.faction = e.target.value; this.commit(); };
+      $('#dAg').onchange = e => { dk.agenda = e.target.value || null; this.commit(); };
+      $('#dDel').onclick = () => this.modal(`<p>${LX('Apagar o deck', 'Delete deck')} "${esc(dk.name)}"?</p>`, [{ label: LX('Apagar', 'Delete'), pri: true, fn: () => { this.decks.splice(this.curIdx - STARTER_DECKS.length, 1); this.saveDecks(); this.selectDeck(0); } }, { label: LX('Cancelar', 'Cancel') }], LX('Apagar deck', 'Delete deck'));
+    }
+    $('#dDup').onclick = () => this.dupDeck();
+    $('#dExp').onclick = () => { const t = exportDeckText(dk); this.modal(`<textarea style="width:min(560px,80vw);height:340px">${esc(t)}</textarea><p class="note">${LX('Este texto pode ser importado de volta aqui ou no ThronesDB.', 'This text can be imported back here or into ThronesDB.')}</p>`, [{ label: LX('Copiar', 'Copy'), pri: true, fn: () => { try { navigator.clipboard.writeText(t); } catch (e) { } } }, { label: 'OK' }], LX('Exportar deck', 'Export deck')); };
+    $('#dPlay').onclick = () => { const i = this.curIdx; this.tab('play'); if (!this.game && $('#lbMe')) $('#lbMe').value = String(i); };
+  },
+  // ---------- importação ----------
+  thronesdbApiUrls(input) {
+    const s = input.trim();
+    let m = s.match(/decklist\/view\/(\d+)/); if (m) return [`https://thronesdb.com/api/public/decklist/${m[1]}`];
+    m = s.match(/deck\/view\/(\d+)/); if (m) return [`https://thronesdb.com/api/public/deck/${m[1]}`];
+    m = s.match(/^(\d+)$/); if (m) return [`https://thronesdb.com/api/public/decklist/${m[1]}`, `https://thronesdb.com/api/public/deck/${m[1]}`];
+    return [];
+  },
+  addImported(txt, m) {
+    const { deck, missing } = importDeck(txt);
+    this.decks.push(deck); this.saveDecks(); if (m) m.remove();
+    this.selectDeck(STARTER_DECKS.length + this.decks.length - 1); this.renderLobby();
+    if (missing.length) this.modal(`<p>${LX('Deck importado, mas estas cartas ainda não existem no simulador (só Core Set por agora):', 'Deck imported, but these cards are not in the simulator yet (Core Set only for now):')}</p><div class="note" style="max-height:300px;overflow:auto">${missing.map(esc).join('<br>')}</div>`, [{ label: 'OK' }], LX('Cartas em falta', 'Missing cards'));
+  },
+  importModal() {
+    const m = this.modal(`<div style="max-width:640px">
+      <p><b>${LX('1. Por link ou número', '1. By link or number')}</b></p>
+      <div style="display:flex;gap:6px"><input id="impUrl" style="flex:1" placeholder="https://thronesdb.com/decklist/view/16711/…  ${LX('ou', 'or')}  16711"><button class="pri" id="impGo">${LX('Buscar', 'Fetch')}</button></div>
+      <div id="impUrlMsg" class="note" style="margin-top:4px"></div>
+      <p style="margin-top:14px"><b>${LX('2. Copiar e colar', '2. Copy and paste')}</b></p>
+      <p class="note">${LX('No ThronesDB abre o deck → <i>Download</i> → <i>Text file</i> (ou <i>Export → Plain text</i>) e cola o conteúdo. Também aceita o JSON de <code>thronesdb.com/api/public/decklist/NÚMERO</code>.', 'On ThronesDB open the deck → <i>Download</i> → <i>Text file</i> (or <i>Export → Plain text</i>) and paste it. The JSON from <code>thronesdb.com/api/public/decklist/NUMBER</code> also works.')}</p>
+      <textarea id="impTxt" style="width:100%;height:200px" placeholder="${LX('Cola aqui o texto ou JSON do ThronesDB…', 'Paste ThronesDB text or JSON here…')}"></textarea><div id="impMsg" class="note"></div>
+      <p class="note">${LX('Por agora só existem as cartas do Core Set; as outras são listadas como em falta.', 'Only Core Set cards exist for now; others are listed as missing.')}</p></div>`,
+      [{ label: LX('Importar texto', 'Import text'), pri: true, fn: false }, { label: LX('Cancelar', 'Cancel') }], LX('Importar do ThronesDB', 'Import from ThronesDB'));
+    m.querySelector('[data-mb="0"]').onclick = () => {
+      const txt = m.querySelector('#impTxt').value; if (!txt.trim()) return;
+      try { this.addImported(txt, m); } catch (e) { m.querySelector('#impMsg').innerHTML = `<span style="color:#ff9c90">${LX('Não consegui ler', 'Could not read it')}: ${esc(e.message)}</span>`; }
+    };
+    m.querySelector('#impGo').onclick = async () => {
+      const urls = this.thronesdbApiUrls(m.querySelector('#impUrl').value); const msg = m.querySelector('#impUrlMsg');
+      if (!urls.length) { msg.innerHTML = `<span style="color:#ff9c90">${LX('Link não reconhecido. Usa um link de decklist/deck do ThronesDB ou o número.', 'Link not recognised. Use a ThronesDB decklist/deck link or its number.')}</span>`; return; }
+      msg.textContent = LX('A buscar…', 'Fetching…');
+      for (const u of urls) {
+        try { const r = await fetch(u); if (!r.ok) continue; const j = await r.json(); if (!j || !j.slots) continue; this.addImported(JSON.stringify(j), m); return; } catch (e) { }
+      }
+      msg.innerHTML = `<span style="color:#ff9c90">${LX('Não consegui contactar o ThronesDB a partir desta página (o browser pode estar a bloquear). Abre o link da API no browser e cola o JSON na opção 2: ', 'Could not reach ThronesDB from this page (the browser may be blocking it). Open the API link in your browser and paste the JSON in option 2: ')}<a href="${urls[0]}" target="_blank" rel="noopener">${urls[0]}</a></span>`;
+    };
+  },
+  // ---------- ajuda ----------
+  renderHelp() {
+    const auto = CARDS.filter(d => isAuto(d.c) && d.t !== 'agenda'), notAuto = CARDS.filter(d => !isAuto(d.c) && d.t !== 'agenda');
+    $('#help').innerHTML = `<div class="wrap"><div class="help">
+      <div class="panel"><h2>${LX('O que está automatizado', 'What is automated')}</h2><div class="note" style="color:var(--txt)">${LX(
+      '<b>Regras base:</b> setup (8 ouro, 1 limited), as 7 fases, iniciativa (desempate por menos poder), primeiro jogador, income/initiative/reserve com modificadores, marshaling com redutores, duplicados (grátis, salvam a carta), unique e dead pile, limited (1 por ronda), desafios Militar/Intriga/Poder, stealth, unopposed, claim (mortes, descarte aleatório, roubo de poder), keywords (renown, insight, intimidate, pillage), ambush, dominance, standing, taxation e descarte por reserve. Ganha quem chegar a 15 de poder; perde quem ficar sem baralho.<br><br><b>Simplificações:</b> há janelas de ações antes de cada desafio, depois dos defensores e na dominance (não entre todos os passos); Treachery e as habilidades das outras facções ainda não estão programadas.<br><br><b>Imagens:</b> as imagens vêm do ThronesDB (ou do CDN da FFG). A página publicada no Claude bloqueia imagens externas, por isso lá aparecem as cartas desenhadas; no ficheiro HTML descarregado as imagens aparecem.',
+      '<b>Core rules:</b> setup (8 gold, 1 limited), all 7 phases, initiative (ties go to lower power), first player, income/initiative/reserve with modifiers, marshaling with cost reducers, duplicates (free, save the card), unique and dead pile, limited (1 per round), Military/Intrigue/Power challenges, stealth, unopposed, claim (kills, random discard, power steal), keywords (renown, insight, intimidate, pillage), ambush, dominance, standing, taxation and reserve discard. First to 15 power wins; running out of deck loses.<br><br><b>Simplifications:</b> action windows happen before each challenge, after defenders are declared and in dominance (not between every step); Treachery and other factions\' abilities are not programmed yet.<br><br><b>Images:</b> images come from ThronesDB (or the FFG CDN). The page published in Claude blocks external images, so drawn cards show there; in the downloaded HTML file the images appear.')}</div></div>
+      <div class="panel" style="position:sticky;top:0;z-index:2"><div class="pvbox" style="min-height:60px"><span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span></div></div>
+      <div class="panel"><h2>${LX('Cartas automatizadas', 'Automated cards')} (${auto.length})</h2><div class="autolist">${auto.map(d => `<div data-code="${d.c}"><span class="fdot" style="--fc:var(--f-${d.f})"></span>${esc(d.n)}</div>`).join('')}</div></div>
+      <div class="panel"><h2>${LX('Ainda por automatizar', 'Not automated yet')} (${notAuto.length})</h2><p class="note">${LX('Estas cartas já entram no deck e jogam com custo, STR, ícones e keywords — só falta o texto especial.', 'These cards can already be used and play with cost, STR, icons and keywords — only the special text is missing.')}</p><div class="autolist">${notAuto.map(d => `<div data-code="${d.c}"><span class="fdot" style="--fc:var(--f-${d.f})"></span>${esc(d.n)}</div>`).join('')}</div></div>
+    </div></div>`;
+  },
+};
+window.addEventListener('DOMContentLoaded', () => UI.init());
+</script>
+</body>
+</html>
