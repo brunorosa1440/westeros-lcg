@@ -163,7 +163,7 @@ const UI = {
     $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
     const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
     document.querySelectorAll('header nav button').forEach(b => b.textContent = nav[b.dataset.t]);
-    $('#tagline').textContent = LX('Protótipo · Core Set · contra IA', 'Prototype · Core Set · vs AI') + ' · ' + APP_VERSION;
+    $('#tagline').textContent = LX('Protótipo · contra IA', 'Prototype · vs AI') + ' · ' + APP_VERSION;
     document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = `<span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span>`);
     this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
     if (this.game) this.render();
