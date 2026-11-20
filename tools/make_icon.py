@@ -48,7 +48,7 @@ def metal_text(img, text, size, cy, tracking=0):
     edge = ImageChops.subtract(mask, mask.filter(ImageFilter.MinFilter(9))).filter(ImageFilter.GaussianBlur(2))
     hl = ImageChops.offset(edge, -3, -3)
     img.paste(Image.new('RGB', (S, S), (255, 255, 255)), (0, 0), hl.point(lambda v: v // 2))
-metal_text(bg, 'W', 560, 470)
+metal_text(bg, 'GOT', 300, 480, tracking=14)
 metal_text(bg, 'LCG', 150, 812, tracking=28)
 # pequeno losango dourado entre as linhas
 d = ImageDraw.Draw(bg); cx, cy = S // 2, 700
