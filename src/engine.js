@@ -142,7 +142,8 @@ class Game {
   resetCard(c) { c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.tmpKw = {}; }
   // carta sai de jogo: anexos e duplicados vão para o descarte do dono
   leavePlay(c, dest) {
-    for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); this.toZone(a, 'discard'); }
+    // regra: anexos voltam à mão do dono (Terminal → descarte); duplicados vão para o descarte
+    for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); const term = a.d.k?.terminal; this.toZone(a, term ? 'discard' : 'hand'); this.log(term ? LX(`${this.cn(a)} (Terminal) vai para o descarte.`, `${this.cn(a)} (Terminal) is discarded.`) : LX(`${this.cn(a)} volta para a mão de ${a.owner.name}.`, `${this.cn(a)} returns to ${a.owner.name}'s hand.`), 'dim'); }
     for (const d of [...c.dupes]) { this.removeFromZone(d); this.resetCard(d); this.toZone(d, 'discard'); }
     this.removeFromZone(c); this.resetCard(c); this.toZone(c, dest);
   }
@@ -182,9 +183,10 @@ class Game {
     let k = 0;
     for (let i = 0; i < n && p.deck.length; i++) { const c = p.deck.shift(); c.zone = 'hand'; p.hand.push(c); k++; }
     if (!quiet && k) this.log(LX(`${p.name} compra ${k} carta${k > 1 ? 's' : ''}.`, `${p.name} draws ${k} card${k > 1 ? 's' : ''}.`));
+    if (this.phase !== 'setup') this.checkDecks();
     return k;
   }
-  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } return c; }
+  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } this.checkDecks(); return c; }
   discardFromHand(p, c) { this.removeFromZone(c); this.toZone(c, 'discard'); }
   gainPower(p, n, card) {
     if (n <= 0) return;
@@ -216,7 +218,7 @@ class Game {
     else if (c.d.t === 'attachment') {
       let target = opts.target;
       if (!target) {
-        const t = this.attachTargets(p, c);
+        const t = this.attachTargets(p, c).filter(x => how !== 'setup' || x.owner === p);
         if (!t.length) { this.toZone(c, 'discard'); this.log(LX(`${this.cn(c)} não tem alvo válido e é descartado.`, `${this.cn(c)} has no valid target and is discarded.`)); return null; }
         [target] = await p.ctrl.chooseCards(this, p, { force: true, prompt: LX(`Escolhe a personagem onde anexar ${this.cn(c)}`, `Choose a character to attach ${this.cn(c)} to`), cands: t, min: 1, max: 1, ai: x => AI.attachScore(this, p, c, x) });
       }
@@ -387,7 +389,7 @@ class Game {
           const cost = dup ? 0 : (c.d.cost || 0);
           if (cost > budget) return false;
           if (c.d.k?.limited && limited >= 1) return false;
-          if (!dup && c.d.t === 'attachment' && !this.attachTargets(p, c).length) return false;
+          if (!dup && c.d.t === 'attachment' && !this.attachTargets(p, c).some(x => x.owner === p)) return false;
           return true;
         });
         if (!cands.length) break;
@@ -440,7 +442,7 @@ class Game {
     if (ia !== ib) w = ia > ib ? a : b;
     else { const pa = this.totalPower(a), pb = this.totalPower(b); w = pa !== pb ? (pa < pb ? a : b) : this.players[Math.floor(Math.random() * 2)]; }
     this.log(LX(`Iniciativa: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} ganha a iniciativa.`, `Initiative: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} wins initiative.`));
-    const firstChoice = await w.ctrl.chooseOption(this, w, { prompt: LX('Ganhaste a iniciativa. Quem é o primeiro jogador?', 'You won initiative. Who will be first player?'), options: [{ label: LX('Eu', 'Me'), value: w }, { label: w.opp.name, value: w.opp }], ai: o => o.value === w ? 1 : 0 });
+    const firstChoice = await w.ctrl.chooseOption(this, w, { prompt: LX('Ganhaste a iniciativa. Quem é o primeiro jogador?', 'You won initiative. Who will be first player?'), options: [{ label: LX('Eu', 'Me'), value: w }, { label: w.opp.name, value: w.opp }], ai: o => AI.firstPlayerScore(this, w, o.value) });
     this.first = firstChoice; this.log(LX(`${this.first.name} é o primeiro jogador.`, `${this.first.name} is first player.`));
     this.emit();
     // when revealed
@@ -535,6 +537,8 @@ class Game {
       const [s] = await att.ctrl.chooseCards(this, att, { prompt: LX(`Stealth de ${this.cn(c)}: escolhe uma personagem que não pode defender`, `${this.cn(c)}'s stealth: choose a character that cannot defend`), cands: t, min: 0, max: 1, ai: x => AI.stealthScore(this, att, x, type) });
       if (s) { ch.stealthed.push(s); this.log(LX(`${this.cn(c)} usa stealth em ${this.cn(s)}.`, `${this.cn(c)} uses stealth on ${this.cn(s)}.`)); }
     }
+    // janela de ações depois de iniciar o desafio (regras: antes dos defensores)
+    await this.actionRound({ phase: 'challenges', ch, active: att, preDefense: true }, this.first, LX(`Desafio ${CH_NAMES[type]} iniciado (ataque ${this.sumStr(ch.attackers)}). Ações antes dos defensores?`, `${CH_NAMES[type]} challenge initiated (attack ${this.sumStr(ch.attackers)}). Actions before defenders?`));
     // defensores
     const dc = def.chars.filter(c => !c.kneel && this.hasIcon(c, type) && !ch.stealthed.includes(c));
     if (dc.length) {
@@ -545,7 +549,7 @@ class Game {
     } else this.log(LX(`${def.name} não tem defensores disponíveis.`, `${def.name} has no available defenders.`), 'ch');
     this.emit();
     // janela de ações
-    await this.actionRound({ phase: 'challenges', ch, active: att }, def, LX(`Desafio ${CH_NAMES[type]} — Ataque ${this.sumStr(ch.attackers)} × Defesa ${this.sumStr(ch.defenders)}. Ações?`, `${CH_NAMES[type]} challenge — Attack ${this.sumStr(ch.attackers)} × Defense ${this.sumStr(ch.defenders)}. Actions?`));
+    await this.actionRound({ phase: 'challenges', ch, active: att }, this.first, LX(`Desafio ${CH_NAMES[type]} — Ataque ${this.sumStr(ch.attackers)} × Defesa ${this.sumStr(ch.defenders)}. Ações?`, `${CH_NAMES[type]} challenge — Attack ${this.sumStr(ch.attackers)} × Defense ${this.sumStr(ch.defenders)}. Actions?`));
     // resultado
     const A = this.sumStr(ch.attackers), D = this.sumStr(ch.defenders);
     if (A >= D && A > 0 && ch.attackers.length) { ch.winner = att; ch.loser = def; }

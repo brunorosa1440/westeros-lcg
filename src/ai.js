@@ -1,5 +1,7 @@
 // ================= IA HEURÍSTICA =================
-const AI = {
+// IA base (v0.5) — mantida para comparação e como reserva
+const AI_BASE = {
+  firstPlayerScore(g, w, choice) { return choice === w ? 1 : 0; },
   wantsMulligan(g, p) {
     const chars = p.hand.filter(c => c.d.t === 'character' && (c.d.cost || 0) <= 8);
     const cheap = chars.filter(c => (c.d.cost || 0) <= 4);
@@ -170,8 +172,9 @@ const AI = {
   },
 };
 
+
 class AICtrl {
-  constructor(delay) { this.delay = delay || 0; this.isAI = true; }
+  constructor(delay, legacy) { this.delay = delay || 0; this.isAI = true; this.legacy = !!legacy; }
   async wait() { if (this.delay) await sleep(this.delay); }
   async chooseCards(g, p, o) {
     await this.wait();

@@ -37,6 +37,8 @@ function validateDeck(dk) {
     const bannerOk = dk.agenda && BANNER_FACTION[dk.agenda] === d.f && !d.l;
     if (d.f !== 'neutral' && d.f !== dk.faction && !bannerOk) errs.push(LX(`${d.n} não pertence à facção ${FACTION_NAMES[dk.faction]}.`, `${d.n} is not in the ${FACTION_NAMES[dk.faction]} faction.`));
   }
+  const dupPlots = Object.entries(dk.cards).filter(([c, n]) => DB[c] && DB[c].t === 'plot' && n > 1);
+  if (dupPlots.length > 1) errs.push(LX('Só um plot pode estar duplicado no baralho de plots.', 'Only one plot may be duplicated in the plot deck.'));
   if (dk.agenda === '01027' && s.neutral > 15) errs.push(LX(`Fealty: máximo 15 cartas neutras (tem ${s.neutral}).`, `Fealty: at most 15 neutral cards (has ${s.neutral}).`));
   if (dk.agenda && BANNER_FACTION[dk.agenda]) { if (BANNER_FACTION[dk.agenda] === dk.faction) errs.push(LX('O estandarte não pode ser da tua própria facção.', 'The banner cannot be your own faction.')); if (s.banner < 12) errs.push(LX(`Estandarte: pelo menos 12 cartas de ${FACTION_NAMES[BANNER_FACTION[dk.agenda]]} (tem ${s.banner}).`, `Banner: at least 12 ${FACTION_NAMES[BANNER_FACTION[dk.agenda]]} cards (has ${s.banner}).`)); }
   return errs;

@@ -75,7 +75,7 @@ Object.assign(AB, {
 // ---------------- AGENDAS ----------------
 Object.assign(AB, {
   '01027': { pt: 'Máx. 15 cartas neutras no deck. Ação: ajoelha a carta de facção para reduzir em 1 o custo da próxima carta loyal que jogares nesta fase.',
-    factionActions: (g, p, ctx) => { if (p.fknelt || ctx.reaction) return []; const f = c => !!c.d.l; return [{ label: LX('Fealty: ajoelhar facção (−1 na próxima carta loyal)', 'Fealty: kneel faction (−1 to next loyal card)'), ai: g.phase === 'marshal' && g.activeP === p ? AI.reducerScore(g, p, f, 1) : 0, run: async () => { p.fknelt = true; p.reducers.push({ amt: 1, f, modes: ['marshal', 'play'] }); g.log(LX(`${p.name} ajoelha a facção (Fealty).`, `${p.name} kneels their faction card (Fealty).`)); } }]; } },
+    factionActions: (g, p, ctx) => { if (p.fknelt || ctx.reaction) return []; if (!((g.phase === 'marshal' && g.activeP === p) || p.hand.some(c => c.d.t === 'event' && c.d.l))) return []; const f = c => !!c.d.l; return [{ label: LX('Fealty: ajoelhar facção (−1 na próxima carta loyal)', 'Fealty: kneel faction (−1 to next loyal card)'), ai: g.phase === 'marshal' && g.activeP === p ? AI.reducerScore(g, p, f, 1) : 0, run: async () => { p.fknelt = true; p.reducers.push({ amt: 1, f, modes: ['marshal', 'play'] }); g.log(LX(`${p.name} ajoelha a facção (Fealty).`, `${p.name} kneels their faction card (Fealty).`)); } }]; } },
 });
 ['01198', '01199', '01200', '01201', '01202', '01203', '01204', '01205'].forEach(c => AB[c] = { pt: 'Podes incluir cartas não-loyal da facção do estandarte; tens de incluir pelo menos 12 dessa facção.' });
 
