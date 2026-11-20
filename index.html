@@ -7,6 +7,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Westeros LCG — Simulador AGoT 2.0</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="Westeros LCG">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>:root{--bg:#0d0e12;--panel:#17191f;--panel2:#1f222a;--line:#2e323c;--gold:#d9a642;--gold2:#f0c96a;--txt:#e6e1d6;--dim:#8d8a83;--red:#c0392b;--green:#3f9d5a;--blue:#3c6fb0;
@@ -2520,7 +2526,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v1.0';
+const APP_VERSION = 'v1.1';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
