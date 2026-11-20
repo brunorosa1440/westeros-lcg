@@ -12,6 +12,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
+const APP_VERSION = 'v0.4';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -26,7 +27,7 @@ const IMG = {
   tag(code, cls) {
     if (!this.on || this.broken.has(code)) return '';
     const g = this.good.get(code);
-    return `<img class="${cls || 'cimg'}${g != null ? ' ok' : ''}" src="${this.urls(code)[g || 0]}" data-img="${code}" data-try="${g || 0}" alt="" onload="imgOk(this)" onerror="imgFail(this)">`;
+    return `<img class="${cls || 'cimg'}${g != null ? ' ok' : ''}" src="${this.urls(code)[g || 0]}" data-img="${code}" data-try="${g || 0}" alt="" referrerpolicy="no-referrer" onload="imgOk(this)" onerror="imgFail(this)">`;
   },
 };
 function imgOk(el) { IMG.oks++; IMG.good.set(el.dataset.img, +el.dataset.try); el.classList.add('ok'); el.parentElement && el.parentElement.classList.add('hasimg'); }
@@ -34,7 +35,7 @@ function imgFail(el) {
   const code = el.dataset.img, i = +el.dataset.try + 1, u = IMG.urls(code);
   if (i < u.length) { el.dataset.try = i; el.src = u[i]; return; }
   IMG.broken.add(code); IMG.fails++; el.remove();
-  if (IMG.fails >= 6 && IMG.oks === 0 && !IMG.warned) { IMG.warned = true; UI.toast(LX('As imagens das cartas não carregam aqui (esta página bloqueia imagens externas). Usa o ficheiro HTML descarregado para ver as imagens do ThronesDB.', 'Card images cannot load here (this page blocks external images). Use the downloaded HTML file to see ThronesDB images.')); }
+  if (IMG.fails >= 6 && IMG.oks === 0 && !IMG.warned) { IMG.warned = true; const t = IMG.urls('01090')[0]; UI.toast(LX(`As imagens das cartas não carregaram. Testa abrir este endereço noutro separador: ${t} — se abrir lá mas não aqui, o site está a bloquear imagens embutidas.`, `Card images did not load. Try opening this address in another tab: ${t} — if it opens there but not here, the site is blocking embedded images.`)); }}
 }
 
 // ---------- desenho das cartas ----------
@@ -148,7 +149,7 @@ const UI = {
     $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
     const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
     document.querySelectorAll('header nav button').forEach(b => b.textContent = nav[b.dataset.t]);
-    $('#tagline').textContent = LX('Protótipo · Core Set · contra IA', 'Prototype · Core Set · vs AI');
+    $('#tagline').textContent = LX('Protótipo · Core Set · contra IA', 'Prototype · Core Set · vs AI') + ' · ' + APP_VERSION;
     document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = `<span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span>`);
     this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
     if (this.game) this.render();
