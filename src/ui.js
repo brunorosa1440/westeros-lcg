@@ -15,9 +15,12 @@ const PACK_CGDB = { '01': 1 };
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
-    const u = [`https://thronesdb.com/bundles/cards/${code}.png`];
-    const cg = PACK_CGDB[code.slice(0, 2)];
-    if (cg) u.push(`https://lcg-cdn.fantasyflightgames.com/got2nd/GT${String(cg).padStart(2, '0')}_${parseInt(code.slice(2), 10)}.jpg`);
+    // Formato atual do ThronesDB: /images/cards/GT{pack cgdb}_{número}.jpg (ex.: Core 01104 → GT01_104.jpg)
+    const u = [];
+    const cg = PACK_CGDB[code.slice(0, 2)], num = parseInt(code.slice(2), 10);
+    if (cg) u.push(`https://thronesdb.com/images/cards/GT${String(cg).padStart(2, '0')}_${num}.jpg`);
+    u.push(`https://thronesdb.com/bundles/cards/${code}.png`);
+    u.push(`https://theironthrone.net/img/cards/${code}.png`);
     return u;
   },
   tag(code, cls) {
