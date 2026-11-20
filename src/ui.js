@@ -12,14 +12,14 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v0.6';
+const APP_VERSION = 'v0.7';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
-    // Formato atual do ThronesDB: /images/cards/GT{pack cgdb}_{número}.jpg (ex.: Core 01104 → GT01_104.jpg)
+    // Formato do ThronesDB: /images/cards/GT{pack cgdb}_{número}.jpg (ex.: Core 01104 → GT01_104.jpg)
     const u = [];
-    const cg = PACK_CGDB[code.slice(0, 2)], num = parseInt(code.slice(2), 10);
-    if (cg) u.push(`https://thronesdb.com/images/cards/GT${String(cg).padStart(2, '0')}_${num}.jpg`);
+    const pk = DB[code] && PACK_BY_CODE[DB[code].pk], num = parseInt(code.slice(2), 10);
+    if (pk && pk.cg) u.push(`https://thronesdb.com/images/cards/GT${String(pk.cg).padStart(2, '0')}_${num}.jpg`);
     u.push(`https://thronesdb.com/bundles/cards/${code}.png`);
     u.push(`https://theironthrone.net/img/cards/${code}.png`);
     return u;
@@ -131,7 +131,7 @@ class HumanCtrl {
 const UI = {
   game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play', pauseInfo: store.get('agot_pause', true), logOpen: store.get('agot_log', true),
   decks: [], cur: null, curIdx: -1,
-  filt: { type: 'character', fac: 'mine', q: '', auto: false },
+  filt: { type: 'character', fac: 'mine', q: '', auto: false, pack: 'all' },
   init() {
     this.decks = store.get('agot_decks', []);
     document.querySelectorAll('header nav button').forEach(b => b.onclick = () => this.tab(b.dataset.t));
@@ -278,7 +278,7 @@ const UI = {
     };
     $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
     let chb = '';
-    if (ch) chb = `<div class="chb">⚔ ${CH_NAMES[ch.type]} · <span class="a">${esc(ch.att.name)} ${g.sumStr(ch.attackers)}</span> × <span class="d">${esc(ch.def.name)} ${g.sumStr(ch.defenders)}</span> · claim ${g.claimValue(ch)}</div>`;
+    if (ch) chb = `<div class="chb">⚔ ${CH_NAMES[ch.type]} · <span class="a">${esc(ch.att.name)} ${g.sideStr(ch, 'att')}</span> × <span class="d">${esc(ch.def.name)} ${g.sideStr(ch, 'def')}</span> · claim ${g.claimValue(ch)}</div>`;
     $('#board').innerHTML = `
       <div class="row locs"><span class="lbl">${LX('Locais adversário', 'Opponent locations')}</span>${op.locs.map(slot).join('')}</div>
       <div class="row"><span class="lbl">${LX('Personagens adversário', 'Opponent characters')}</span>${op.chars.map(slot).join('')}</div>
@@ -399,21 +399,24 @@ const UI = {
     if (f.fac === 'mine') list = list.filter(d => d.f === dk.faction || d.f === 'neutral' || (dk.agenda && BANNER_FACTION[dk.agenda] === d.f && !d.l));
     else if (f.fac !== 'all') list = list.filter(d => d.f === f.fac);
     if (f.q) list = list.filter(d => (d.n + ' ' + d.tr.join(' ')).toLowerCase().includes(f.q.toLowerCase()));
+    if (f.pack !== 'all') list = list.filter(d => d.pk === f.pack);
     if (f.auto) list = list.filter(d => isAuto(d.c));
     list.sort((a, b) => (a.f === dk.faction ? 0 : 1) - (b.f === dk.faction ? 0 : 1) || (a.cost || 0) - (b.cost || 0) || a.n.localeCompare(b.n));
     const isAgenda = f.type === 'agenda';
     $('#pool').innerHTML = `<div class="filters">${types.map(([k, l]) => `<button data-ft="${k}" class="${f.type === k ? 'on' : ''}">${l}</button>`).join('')}
       <span style="flex:1"></span><button id="viewBtn" title="${LX('Alternar vista', 'Toggle view')}">${f.grid ? LX('☰ Lista', '☰ List') : LX('▦ Imagens', '▦ Images')}</button></div>
       <div class="filters"><select id="fFac">${facs.map(([k, l]) => `<option value="${k}" ${f.fac === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <select id="fPack"><option value="all">${LX('Todos os packs', 'All packs')}</option>${PACKS.map(pk => `<option value="${pk.c}" ${f.pack === pk.c ? 'selected' : ''}>${esc(pk.n)}</option>`).join('')}</select>
       <input id="fQ" placeholder="${LX('Procurar nome ou trait…', 'Search name or trait…')}" value="${esc(f.q)}" style="flex:1;min-width:140px"><label class="note"><input type="checkbox" id="fAuto" ${f.auto ? 'checked' : ''}> ${LX('só automatizadas', 'automated only')}</label></div>
       <div class="tbl">${f.grid ? this.poolGrid(list, isAgenda) : `<table><thead><tr><th>${LX('Nome', 'Name')}</th><th>${LX('Facção', 'Faction')}</th><th>${LX('Custo', 'Cost')}</th><th>STR</th><th>${LX('Ícones', 'Icons')}</th><th>Auto</th><th>${LX('Qtd', 'Qty')}</th></tr></thead><tbody>
-      ${list.map(d => `<tr data-code="${d.c}"><td>${d.u ? '◆ ' : ''}${esc(d.n)}${d.l ? ' <small class="note">loyal</small>' : ''}</td><td><span class="fdot" style="--fc:var(--f-${d.f})"></span>${FACTION_NAMES[d.f]}</td><td>${d.cost ?? (d.p ? '💰' + d.p[0] : '')}</td><td>${d.s ?? (d.p ? '⚡' + d.p[1] : '')}</td><td>${iconsHTML(d.i)}</td><td>${isAuto(d.c) ? '✓' : '⚠'}</td><td>${this.qtyHTML(d, isAgenda)}</td></tr>`).join('')}
+      ${list.map(d => `<tr data-code="${d.c}"><td>${d.u ? '◆ ' : ''}${esc(d.n)}${d.l ? ' <small class="note">loyal</small>' : ''}</td><td><span class="fdot" style="--fc:var(--f-${d.f})"></span>${FACTION_NAMES[d.f]} <small class="note">${esc((PACK_BY_CODE[d.pk] || {}).n || '')}</small></td><td>${d.cost ?? (d.p ? '💰' + d.p[0] : '')}</td><td>${d.s ?? (d.p ? '⚡' + d.p[1] : '')}</td><td>${iconsHTML(d.i)}</td><td>${isAuto(d.c) ? '✓' : '⚠'}</td><td>${this.qtyHTML(d, isAgenda)}</td></tr>`).join('')}
       </tbody></table>`}${list.length ? '' : `<p class="note" style="padding:10px">${LX('Nenhuma carta com estes filtros.', 'No cards match these filters.')}</p>`}</div>`;
     $('#pool').querySelectorAll('[data-ft]').forEach(b => b.onclick = () => { f.type = b.dataset.ft; this.renderPool(); });
     $('#viewBtn').onclick = () => { f.grid = !f.grid; this.renderPool(); };
     $('#fFac').onchange = e => { f.fac = e.target.value; this.renderPool(); };
     $('#fQ').oninput = e => { f.q = e.target.value; clearTimeout(this._qt); this._qt = setTimeout(() => { this.renderPool(); const i = $('#fQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
     $('#fAuto').onchange = e => { f.auto = e.target.checked; this.renderPool(); };
+    $('#fPack').onchange = e => { f.pack = e.target.value; this.renderPool(); };
     $('#pool').querySelector('.tbl').onclick = e => { const b = e.target.closest('[data-q]'); if (!b) return; const code = b.closest('[data-code]').dataset.code; const n = +b.dataset.q;
       if (isAgenda) { if (this.isStarter()) return this.setQty(code, n); this.cur.agenda = n ? code : null; this.commit(); } else this.setQty(code, n); };
   },
@@ -454,7 +457,7 @@ const UI = {
     const { deck, missing } = importDeck(txt);
     this.decks.push(deck); this.saveDecks(); if (m) m.remove();
     this.selectDeck(STARTER_DECKS.length + this.decks.length - 1); this.renderLobby();
-    if (missing.length) this.modal(`<p>${LX('Deck importado, mas estas cartas ainda não existem no simulador (só Core Set por agora):', 'Deck imported, but these cards are not in the simulator yet (Core Set only for now):')}</p><div class="note" style="max-height:300px;overflow:auto">${missing.map(esc).join('<br>')}</div>`, [{ label: 'OK' }], LX('Cartas em falta', 'Missing cards'));
+    if (missing.length) this.modal(`<p>${LX('Deck importado, mas estas cartas não foram encontradas:', 'Deck imported, but these cards were not found:')}</p><div class="note" style="max-height:300px;overflow:auto">${missing.map(esc).join('<br>')}</div>`, [{ label: 'OK' }], LX('Cartas em falta', 'Missing cards'));
   },
   importModal() {
     const m = this.modal(`<div style="max-width:640px">
@@ -464,7 +467,7 @@ const UI = {
       <p style="margin-top:14px"><b>${LX('2. Copiar e colar', '2. Copy and paste')}</b></p>
       <p class="note">${LX('No ThronesDB abre o deck → <i>Download</i> → <i>Text file</i> (ou <i>Export → Plain text</i>) e cola o conteúdo. Também aceita o JSON de <code>thronesdb.com/api/public/decklist/NÚMERO</code>.', 'On ThronesDB open the deck → <i>Download</i> → <i>Text file</i> (or <i>Export → Plain text</i>) and paste it. The JSON from <code>thronesdb.com/api/public/decklist/NUMBER</code> also works.')}</p>
       <textarea id="impTxt" style="width:100%;height:200px" placeholder="${LX('Cola aqui o texto ou JSON do ThronesDB…', 'Paste ThronesDB text or JSON here…')}"></textarea><div id="impMsg" class="note"></div>
-      <p class="note">${LX('Por agora só existem as cartas do Core Set; as outras são listadas como em falta.', 'Only Core Set cards exist for now; others are listed as missing.')}</p></div>`,
+      <p class="note">${LX('Todas as cartas existem; as que ainda não têm habilidade automatizada jogam só com custo, STR, ícones e keywords (marcadas com ⚠).', 'All cards exist; those without an automated ability play with cost, STR, icons and keywords only (marked ⚠).')}</p></div>`,
       [{ label: LX('Importar texto', 'Import text'), pri: true, fn: false }, { label: LX('Cancelar', 'Cancel') }], LX('Importar do ThronesDB', 'Import from ThronesDB'));
     m.querySelector('[data-mb="0"]').onclick = () => {
       const txt = m.querySelector('#impTxt').value; if (!txt.trim()) return;
@@ -489,7 +492,7 @@ const UI = {
       '<b>Core rules:</b> setup (8 gold, 1 limited), all 7 phases, initiative (ties go to lower power), first player, income/initiative/reserve with modifiers, marshaling with cost reducers, duplicates (free, save the card), unique and dead pile, limited (1 per round), Military/Intrigue/Power challenges, stealth, unopposed, claim (kills, random discard, power steal), keywords (renown, insight, intimidate, pillage), ambush, dominance, standing, taxation and reserve discard. First to 15 power wins; running out of deck loses.<br><br><b>Simplifications:</b> action windows happen before each challenge, after defenders are declared and in dominance (not between every step); Treachery and other factions\' abilities are not programmed yet.<br><br><b>Images:</b> images come from ThronesDB (or the FFG CDN). The page published in Claude blocks external images, so drawn cards show there; in the downloaded HTML file the images appear.')}</div></div>
       <div class="panel" style="position:sticky;top:0;z-index:2"><div class="pvbox" style="min-height:60px"><span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span></div></div>
       <div class="panel"><h2>${LX('Cartas automatizadas', 'Automated cards')} (${auto.length})</h2><div class="autolist">${auto.map(d => `<div data-code="${d.c}"><span class="fdot" style="--fc:var(--f-${d.f})"></span>${esc(d.n)}</div>`).join('')}</div></div>
-      <div class="panel"><h2>${LX('Ainda por automatizar', 'Not automated yet')} (${notAuto.length})</h2><p class="note">${LX('Estas cartas já entram no deck e jogam com custo, STR, ícones e keywords — só falta o texto especial.', 'These cards can already be used and play with cost, STR, icons and keywords — only the special text is missing.')}</p><div class="autolist">${notAuto.map(d => `<div data-code="${d.c}"><span class="fdot" style="--fc:var(--f-${d.f})"></span>${esc(d.n)}</div>`).join('')}</div></div>
+      <div class="panel"><h2>${LX('Ainda por automatizar', 'Not automated yet')} (${notAuto.length})</h2><p class="note">${LX('Estas cartas já entram no deck e jogam com custo, STR, ícones e keywords — só falta o texto especial.', 'These cards can already be used and play with cost, STR, icons and keywords — only the special text is missing.')}</p><p class="note">${LX('Todas as cartas de todos os packs já existem no simulador; estas ainda não têm a habilidade programada. Usa o filtro “só automatizadas” no construtor de decks.', 'Every card from every pack exists in the simulator; these do not have their ability programmed yet. Use the “automated only” filter in the deck builder.')}</p></div>
     </div></div>`;
   },
 };

@@ -1,6 +1,8 @@
 // ================= MOTOR DE JOGO — AGoT 2ª edição (protótipo) =================
 const DB = {}; CARDS.forEach(d => DB[d.c] = d);
-const NAME_IDX = {}; CARDS.forEach(d => { NAME_IDX[d.n.toLowerCase()] = d.c; });
+const NAME_IDX = {}; CARDS.forEach(d => { const k = d.n.toLowerCase(); if (!NAME_IDX[k]) NAME_IDX[k] = d.c; });
+const PACK_BY_CODE = {}; (typeof PACKS !== 'undefined' ? PACKS : []).forEach(pk => PACK_BY_CODE[pk.c] = pk);
+const NAME_PACK_IDX = {}; CARDS.forEach(d => { const pk = PACK_BY_CODE[d.pk]; if (pk) NAME_PACK_IDX[d.n.toLowerCase() + '|' + pk.n.toLowerCase()] = d.c; });
 // ---------- idioma (PT / EN) ----------
 let LANG = (() => { try { return localStorage.getItem('agot_lang') || 'pt'; } catch (e) { return 'pt'; } })();
 function LX(pt, en) { return LANG === 'en' ? en : pt; }
@@ -80,11 +82,14 @@ class Game {
     let s = (c.d.s || 0) + c.tmp + c.ph;
     if (!this.blank(c) && ab(c).str) s += ab(c).str(this, c);
     for (const a of c.att) if (ab(a).attStr) s += ab(a).attStr(this, a, c);
+    if (c.zone === 'chars') for (const o of this.auraSources()) if (o !== c) s += ab(o).strAura(this, o, c) || 0;
     return Math.max(0, s);
+  }
+  auraSources() { const r = []; for (const p of this.players) for (const o of p.chars) if (ab(o).strAura && !this.blank(o)) r.push(o); return r;
   }
   hasIcon(c, type) {
     const L = ICON_OF[type];
-    if ((c.d.i || '').includes(L) || c.tmpIcons.includes(L)) return true;
+    if ((c.d.i || '').includes(L) || c.tmpIcons.includes(L) || (c.phIcons || '').includes(L)) return true;
     if (!this.blank(c) && ab(c).icons && ab(c).icons(this, c).includes(L)) return true;
     for (const a of c.att) if (ab(a).attIcons && ab(a).attIcons(this, a, c).includes(L)) return true;
     return false;
@@ -139,7 +144,7 @@ class Game {
     const p = c.owner; c.zone = z;
     if (z === 'hand') p.hand.push(c); else if (z === 'deck') p.deck.unshift(c); else if (z === 'discard') p.discard.push(c); else if (z === 'dead') p.dead.push(c); else if (z === 'removed') p.removed.push(c);
   }
-  resetCard(c) { c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.tmpKw = {}; }
+  resetCard(c) { c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.phIcons = ''; c.tmpKw = {}; c.tokens = 0; }
   // carta sai de jogo: anexos e duplicados vão para o descarte do dono
   leavePlay(c, dest) {
     // regra: anexos voltam à mão do dono (Terminal → descarte); duplicados vão para o descarte
@@ -149,6 +154,7 @@ class Game {
   }
   async trySave(c) {
     if (c.dupes.length) { const d = c.dupes[0]; this.removeFromZone(d); this.toZone(d, 'discard'); this.log(LX(`${this.cn(c)} é salvo ao descartar um duplicado.`, `${this.cn(c)} is saved by discarding a duplicate.`)); return true; }
+    for (const o of this.inPlay(c.owner)) if (o !== c && !this.blank(o) && ab(o).saveOther && this.canTrigger(o.owner)) { if (await ab(o).saveOther(this, o, c)) return true; }
     const bg = c.att.find(a => a.code === '01033');
     if (bg && this.canTrigger(bg.owner)) { this.removeFromZone(bg); this.resetCard(bg); this.toZone(bg, 'discard'); this.log(LX(`${bg.owner.name} sacrifica Bodyguard para salvar ${this.cn(c)}.`, `${bg.owner.name} sacrifices Bodyguard to save ${this.cn(c)}.`)); return true; }
     return false;
@@ -157,28 +163,39 @@ class Game {
     if (c.zone !== 'chars') return false;
     if (opts.save !== false && await this.trySave(c)) return false;
     const p = c.owner;
-    this.leavePlay(c, 'dead');
-    this.log(LX(`☠ ${this.cn(c)} (${p.name}) foi morto.`, `☠ ${this.cn(c)} (${p.name}) is killed.`), 'kill');
+    await this.beforeLeave(c, 'killed');
+    if (c.zone !== 'chars') return false;
+    let dest = 'dead';
+    if (!this.blank(c) && ab(c).killedToHand) dest = 'hand';
+    if (dest === 'dead') for (const o of [...p.locs]) if (!this.blank(o) && ab(o).replaceKill && this.canTrigger(p) && await ab(o).replaceKill(this, o, c)) { dest = 'hand'; break; }
+    this.leavePlay(c, dest);
+    this.log(dest === 'dead' ? LX(`☠ ${this.cn(c)} (${p.name}) foi morto.`, `☠ ${this.cn(c)} (${p.name}) is killed.`) : LX(`☠ ${this.cn(c)} (${p.name}) foi morto e volta para a mão.`, `☠ ${this.cn(c)} (${p.name}) is killed and returns to hand.`), 'kill');
     await this.afterLeave(c, 'killed');
     return true;
   }
   async discardFromPlay(c, opts = {}) {
     if (!['chars', 'locs', 'att'].includes(c.zone)) return false;
     if (c.zone === 'chars' && opts.save !== false && await this.trySave(c)) return false;
+    await this.beforeLeave(c, 'discarded');
+    if (!['chars', 'locs', 'att'].includes(c.zone)) return false;
     this.leavePlay(c, 'discard');
     this.log(LX(`${this.cn(c)} (${c.owner.name}) foi descartado de jogo.`, `${this.cn(c)} (${c.owner.name}) is discarded from play.`));
     return true;
   }
   async sacrifice(c) {
     const wasChar = c.zone === 'chars';
+    await this.beforeLeave(c, 'sacrificed');
     this.leavePlay(c, 'discard');
     this.log(LX(`${c.owner.name} sacrifica ${this.cn(c)}.`, `${c.owner.name} sacrifices ${this.cn(c)}.`));
     if (wasChar) await this.afterLeave(c, 'sacrificed');
   }
+  async beforeLeave(c, how) {
+    if (!this.blank(c) && ab(c).onLeave && this.canTrigger(c.owner)) await ab(c).onLeave(this, c, how);
+  }
   async afterLeave(c, how) {
     for (const o of this.allInPlay()) if (!this.blank(o) && ab(o).afterCharLeaves && this.canTrigger(o.owner)) await ab(o).afterCharLeaves(this, o, c, how);
   }
-  returnToHand(c) { this.leavePlay(c, 'hand'); this.log(LX(`${this.cn(c)} volta para a mão de ${c.owner.name}.`, `${this.cn(c)} returns to ${c.owner.name}'s hand.`)); }
+  async returnToHand(c) { await this.beforeLeave(c, 'returned'); this.leavePlay(c, 'hand'); this.log(LX(`${this.cn(c)} volta para a mão de ${c.owner.name}.`, `${this.cn(c)} returns to ${c.owner.name}'s hand.`)); }
   draw(p, n, quiet) {
     let k = 0;
     for (let i = 0; i < n && p.deck.length; i++) { const c = p.deck.shift(); c.zone = 'hand'; p.hand.push(c); k++; }
@@ -186,10 +203,13 @@ class Game {
     if (this.phase !== 'setup') this.checkDecks();
     return k;
   }
-  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } this.checkDecks(); return c; }
-  discardFromHand(p, c) { this.removeFromZone(c); this.toZone(c, 'discard'); }
+  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.onDiscardedFromHandOrDeck(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } this.checkDecks(); return c; }
+  discardFromHand(p, c) { this.removeFromZone(c); this.toZone(c, 'discard'); this.onDiscardedFromHandOrDeck(c); }
+  onDiscardedFromHandOrDeck(c) { if (ab(c).fromDiscardToPlay) this.pendingIntoPlay = [...(this.pendingIntoPlay || []), c]; }
+  async flushPending() { const l = this.pendingIntoPlay || []; this.pendingIntoPlay = []; for (const c of l) if (c.zone === 'discard') { this.log(LX(`${this.cn(c)} entra em jogo em vez de ir para o descarte.`, `${this.cn(c)} enters play instead of being discarded.`)); await this.putIntoPlay(c.owner, c, 'put'); } }
   gainPower(p, n, card) {
     if (n <= 0) return;
+    if (card && this.anyPlot('09048') && !card.d.tr.includes('King') && !card.d.tr.includes('Queen')) { this.log(LX(`${this.cn(card)} não pode ganhar poder (Your King Commands It).`, `${this.cn(card)} cannot gain power (Your King Commands It).`), 'dim'); return; }
     if (card) { card.power += n; this.log(LX(`${this.cn(card)} ganha ${n} de poder.`, `${this.cn(card)} gains ${n} power.`), 'pow'); }
     else { p.power += n; this.log(LX(`${p.name} ganha ${n} de poder para a facção.`, `${p.name} gains ${n} power for their faction.`), 'pow'); }
     this.checkWin();
@@ -203,7 +223,7 @@ class Game {
   uniqueBlockedByDead(p, c) { return c.d.u && p.dead.some(o => o.d.n === c.d.n); }
   attachTargets(p, a) {
     const f = ab(a).attachOk;
-    return this.allChars().filter(t => !t.d.k?.noAttach && (!f || f(this, a, t, p)));
+    return this.allChars().filter(t => !t.d.k?.noAttach && !(ab(t).noAttach && !this.blank(t)) && !(ab(t).attachOnly && !a.d.tr.includes(ab(t).attachOnly)) && (!f || f(this, a, t, p)));
   }
   async putIntoPlay(p, c, how, opts = {}) {
     // how: 'setup' | 'marshal' | 'put' | 'ambush'
@@ -236,8 +256,9 @@ class Game {
   // ---------- custos ----------
   reducerTotal(p, c, mode) {
     let red = 0;
-    for (const r of p.reducers) if (r.modes.includes(mode) && r.f(c)) red += r.amt;
+    for (const r of p.reducers) if (r.modes.includes(mode) && r.f(c)) red += typeof r.amt === 'function' ? r.amt(c) : r.amt;
     if (mode === 'marshal' && this.myPlot(p, '01004') && !p.flags.nobleUsed && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) red += 2;
+    if (mode === 'marshal' && this.myPlot(p, '10047')) { const k = 'pp_' + c.d.t; if (!p.flags[k]) red += { character: 3, location: 2, attachment: 1 }[c.d.t] || 0; }
     return red;
   }
   costOf(p, c, mode) {
@@ -248,6 +269,7 @@ class Game {
   consumeReducers(p, c, mode) {
     p.reducers = p.reducers.filter(r => !(r.modes.includes(mode) && r.f(c)));
     if (mode === 'marshal' && this.myPlot(p, '01004') && c.d.t === 'character' && (this.hasTrait(c, 'Lord') || this.hasTrait(c, 'Lady'))) p.flags.nobleUsed = true;
+    if (mode === 'marshal' && this.myPlot(p, '10047')) p.flags['pp_' + c.d.t] = true;
   }
   canMarshal(p, c) {
     if (c.zone !== 'hand' || !['character', 'location', 'attachment'].includes(c.d.t)) return false;
@@ -311,12 +333,21 @@ class Game {
     const opts = [];
     const bran = q.chars.find(x => x.code === '01142' && !this.blank(x));
     if (bran) opts.push({ label: LX('Sacrificar Bran Stark para cancelar', 'Sacrifice Bran Stark to cancel'), value: 'bran' });
+    const waw = q.hand.find(x => x.code === '09044');
+    if (waw && !this.myPlot(q, '01016')) opts.push({ label: LX('Jogar Words Are Wind (o adversário escolhe: cancelar ou tu compras 2)', 'Play Words Are Wind (opponent chooses: cancel or you draw 2)'), value: 'waw' });
     const hj = q.hand.find(x => x.code === '01045');
     if (hj && q.gold >= (evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0) && !this.myPlot(q, '01016')) opts.push({ label: LX(`Jogar The Hand's Judgment (${evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0} ouro)`, `Play The Hand's Judgment (${evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0} gold)`), value: 'hj' });
     if (!opts.length) return false;
     opts.push({ label: LX('Não cancelar', "Don't cancel"), value: null });
     const v = await q.ctrl.chooseOption(this, q, { prompt: LX(`${evCard.owner.name} jogou ${this.cn(evCard)}. Cancelar?`, `${evCard.owner.name} played ${this.cn(evCard)}. Cancel it?`), options: opts, ai: o => o.value ? AI.cancelScore(this, q, evCard) : 0, card: evCard });
     if (v === 'bran') { await this.sacrifice(bran); this.log(LX(`Efeito de ${this.cn(evCard)} cancelado.`, `${this.cn(evCard)}'s effects are cancelled.`)); return true; }
+    if (v === 'waw') {
+      this.removeFromZone(waw); this.toZone(waw, 'discard'); this.log(LX(`${q.name} joga Words Are Wind.`, `${q.name} plays Words Are Wind.`), 'ev');
+      const p = evCard.owner;
+      const c2 = await p.ctrl.chooseOption(this, p, { prompt: LX(`Words Are Wind: cancelar o teu ${this.cn(evCard)} ou ${q.name} compra 2 cartas?`, `Words Are Wind: cancel your ${this.cn(evCard)} or ${q.name} draws 2 cards?`), options: [{ label: LX(`${q.name} compra 2`, `${q.name} draws 2`), value: 'draw' }, { label: LX('Cancelar o evento', 'Cancel the event'), value: 'cancel' }], ai: o => o.value === 'draw' ? 1 : 0 });
+      if (c2 === 'cancel') { this.log(LX(`Efeito de ${this.cn(evCard)} cancelado.`, `${this.cn(evCard)}'s effects are cancelled.`)); return true; }
+      this.draw(q, 2); return false;
+    }
     if (v === 'hj') { const x = evCard.d.cost === 'X' ? evCost : evCard.d.cost || 0; q.gold -= x; this.removeFromZone(hj); this.toZone(hj, 'discard'); this.log(LX(`${q.name} joga The Hand's Judgment: ${this.cn(evCard)} é cancelado.`, `${q.name} plays The Hand's Judgment: ${this.cn(evCard)} is cancelled.`), 'ev'); return true; }
     return false;
   }
@@ -331,6 +362,7 @@ class Game {
     }
     if (p.plot && ab(p.plot).actions) for (const a of ab(p.plot).actions(this, p.plot, ctx) || []) acts.push({ card: p.plot, ...a });
     if (p.agenda && AB[p.agenda] && AB[p.agenda].factionActions) for (const a of AB[p.agenda].factionActions(this, p, ctx) || []) acts.push({ card: null, faction: true, ...a });
+    for (const c of p.hand) if (ab(c).handActions && this.canTrigger(p)) for (const a of ab(c).handActions(this, c, ctx) || []) acts.push({ card: c, ...a });
     for (const c of p.hand) if (this.canPlayEvent(p, c, 'action', ctx)) acts.push({ card: c, label: LX(`Jogar ${this.cn(c)}`, `Play ${this.cn(c)}`), ai: ab(c).ev.ai ? ab(c).ev.ai(this, p, ctx) : 1, run: () => this.playEvent(p, c, ctx) });
     if (ctx.phase === 'challenges') for (const c of p.hand) if (this.canAmbush(p, c)) acts.push({ card: c, label: LX(`Ambush (${this.ambushCost(p, c)} ouro)`, `Ambush (${this.ambushCost(p, c)} gold)`), ai: AI.ambushScore(this, p, c, ctx), run: () => this.ambush(p, c) });
     return acts;
@@ -343,11 +375,16 @@ class Game {
       const acts = this.availableActions(cur, ctx);
       let chosen = null;
       if (acts.length) chosen = await cur.ctrl.actionWindow(this, cur, { prompt: prompt || LX('Janela de ações', 'Action window'), actions: acts, passLabel: LX('Passar', 'Pass'), ctx });
-      if (chosen && chosen.run) { await chosen.run(); passes = 0; this.emit(); }
+      if (chosen && chosen.run) { await chosen.run(); await this.flushPending(); await this.checkZero(); passes = 0; this.emit(); }
       else passes++;
       cur = cur.opp;
     }
   }
+  // personagens marcadas para morrer com STR 0 (Dracarys!, Consuming Flames, Plaza of Punishment)
+  async checkZero() {
+    for (const c of this.allChars()) if (c.flags.dieAt0 === this.phase && this.str(c) <= 0) { this.log(LX(`${this.cn(c)} fica com STR 0 e morre.`, `${this.cn(c)} drops to 0 STR and is killed.`)); await this.kill(c); }
+  }
+  canStand(c) { return !(c.flags.noStand === this.phase); }
   // ---------- reações genéricas ----------
   async fire(hook, ...args) {
     for (const p of this.order()) {
@@ -419,12 +456,12 @@ class Game {
     const cbs = this.endOfPhase; this.endOfPhase = [];
     for (const f of cbs) await f();
     await this.fire('onPhaseEnd', this.phase);
-    for (const p of this.players) { p.reducers = []; for (const c of p.chars) { c.ph = 0; } }
+    for (const p of this.players) { p.reducers = []; for (const c of p.chars) { c.ph = 0; c.phIcons = ''; } }
     this.emit();
   }
   async plotPhase() {
     const m0 = this.mark();
-    this.phase = 'plot'; this.log(LX(`— Ronda ${this.round}: Plot —`, `— Round ${this.round}: Plot —`), 'phase');
+    this.phase = 'plot'; this.log(LX(`— Ronda ${this.round}: Plot —`, `— Round ${this.round}: Plot —`), 'phase'); await this.fire('onPhaseBegin', 'plot');
     const chosen = [];
     for (const p of this.players) {
       if (!p.plots.length) { p.plots.push(...p.used); p.used.forEach(c => c.zone = 'plots'); p.used = []; }
@@ -442,7 +479,7 @@ class Game {
     if (ia !== ib) w = ia > ib ? a : b;
     else { const pa = this.totalPower(a), pb = this.totalPower(b); w = pa !== pb ? (pa < pb ? a : b) : this.players[Math.floor(Math.random() * 2)]; }
     this.log(LX(`Iniciativa: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} ganha a iniciativa.`, `Initiative: ${a.name} ${ia} × ${b.name} ${ib}. ${w.name} wins initiative.`));
-    const firstChoice = await w.ctrl.chooseOption(this, w, { prompt: LX('Ganhaste a iniciativa. Quem é o primeiro jogador?', 'You won initiative. Who will be first player?'), options: [{ label: LX('Eu', 'Me'), value: w }, { label: w.opp.name, value: w.opp }], ai: o => AI.firstPlayerScore(this, w, o.value) });
+    const firstChoice = this.myPlot(w, '07047') ? (this.log(LX(`Retaliation: ${w.name} tem de escolher o adversário como primeiro jogador.`, `Retaliation: ${w.name} must choose the opponent as first player.`)), w.opp) : await w.ctrl.chooseOption(this, w, { prompt: LX('Ganhaste a iniciativa. Quem é o primeiro jogador?', 'You won initiative. Who will be first player?'), options: [{ label: LX('Eu', 'Me'), value: w }, { label: w.opp.name, value: w.opp }], ai: o => AI.firstPlayerScore(this, w, o.value) });
     this.first = firstChoice; this.log(LX(`${this.first.name} é o primeiro jogador.`, `${this.first.name} is first player.`));
     this.emit();
     // when revealed
@@ -454,13 +491,14 @@ class Game {
     await this.endPhase();
   }
   async drawPhase() {
-    this.phase = 'draw'; this.log('— Draw —', 'phase');
-    for (const p of this.order()) this.draw(p, 2);
+    this.phase = 'draw'; this.log('— Draw —', 'phase'); await this.fire('onPhaseBegin', 'draw');
+    const extra = this.players.filter(q => q.plot && q.plot.code === '05051').length;
+    for (const p of this.order()) this.draw(p, 2 + extra);
     this.checkDecks();
     await this.endPhase();
   }
   async marshalPhase() {
-    this.phase = 'marshal'; this.log('— Marshaling —', 'phase');
+    this.phase = 'marshal'; this.log('— Marshaling —', 'phase'); await this.fire('onPhaseBegin', 'marshal');
     for (const p of this.order()) {
       const mm = this.mark();
       const inc = this.income(p); p.gold += inc; this.log(LX(`${p.name} recolhe ${inc} ouro (total ${p.gold}).`, `${p.name} collects ${inc} gold (total ${p.gold}).`), 'gold');
@@ -487,6 +525,8 @@ class Game {
     let n = 1;
     if (t === 'military' && this.myPlot(p, '01005')) n++;
     if (t === 'intrigue' && p.locs.some(l => l.code === '01097' && !this.blank(l))) n++;
+    if (t === 'military') n += p.chars.filter(c => c.code === '01162' && !this.blank(c)).length;
+    if (t === 'power' && this.myPlot(p, '08040')) n++;
     return n;
   }
   canAttackWith(p, c, t) { return c.zone === 'chars' && !c.kneel && this.hasIcon(c, t); }
@@ -494,13 +534,14 @@ class Game {
     if ((p.chDone[t] || 0) >= this.maxOfType(p, t)) return false;
     const total = CH_TYPES.reduce((s, x) => s + (p.chDone[x] || 0), 0);
     if (this.myPlot(p, '01021') && total >= 1) return false;
+    if (this.myPlot(p, '08040') && t !== 'power') return false;
     if (this.anyPlot('01003') && t !== 'intrigue' && !p.won.intrigue) return false;
     return p.chars.some(c => this.canAttackWith(p, c, t));
   }
   async challengesPhase() {
-    this.phase = 'challenges'; this.log('— Challenges —', 'phase');
+    this.phase = 'challenges'; this.log('— Challenges —', 'phase'); await this.fire('onPhaseBegin', 'challenges');
     if (this.anyPlot('01023')) { for (const p of this.players) p.gold = 0; this.log(LX('Supporting the Faith: todo o ouro volta ao tesouro.', 'Supporting the Faith: all gold returns to the treasury.')); }
-    for (const p of this.players) { p.chDone = {}; p.won = {}; }
+    for (const p of this.players) { p.chDone = {}; p.won = {}; p.lost = {}; }
     for (const p of this.order()) {
       this.activeP = p;
       let guard = 0;
@@ -515,6 +556,7 @@ class Game {
       }
     }
     this.activeP = null;
+    await this.fire('onChallengesEnd');
     await this.endPhase();
   }
   async doChallenge(att, type) {
@@ -530,6 +572,7 @@ class Game {
     this.log(LX(`${att.name} inicia um desafio ${CH_NAMES[type]} com ${attackers.map(c => this.cn(c)).join(', ')}.`, `${att.name} initiates a challenge (${CH_NAMES[type]}) with ${attackers.map(c => this.cn(c)).join(', ')}.`), 'ch');
     this.emit();
     await this.fire('afterChallengeInitiated', ch);
+    await this.fire('afterAttackersDeclared', ch);
     // stealth
     for (const c of ch.attackers) if (this.hasKw(c, 'stealth')) {
       const t = def.chars.filter(x => !this.hasKw(x, 'stealth') && !ch.stealthed.includes(x));
@@ -551,13 +594,14 @@ class Game {
     // janela de ações
     await this.actionRound({ phase: 'challenges', ch, active: att }, this.first, LX(`Desafio ${CH_NAMES[type]} — Ataque ${this.sumStr(ch.attackers)} × Defesa ${this.sumStr(ch.defenders)}. Ações?`, `${CH_NAMES[type]} challenge — Attack ${this.sumStr(ch.attackers)} × Defense ${this.sumStr(ch.defenders)}. Actions?`));
     // resultado
-    const A = this.sumStr(ch.attackers), D = this.sumStr(ch.defenders);
+    await this.checkZero();
+    const A = this.sideStr(ch, 'att'), D = this.sideStr(ch, 'def');
     if (A >= D && A > 0 && ch.attackers.length) { ch.winner = att; ch.loser = def; }
     else if (D > A) { ch.winner = def; ch.loser = att; }
     ch.diff = Math.abs(A - D);
     if (!ch.winner) { this.log(LX(`Desafio ${CH_NAMES[type]}: sem vencedor (${A} × ${D}).`, `${CH_NAMES[type]} challenge: no winner (${A} × ${D}).`), 'ch'); this.cleanupChallenge(); await this.informChallenge(ch, mc, A, D); return; }
     this.log(LX(`Desafio ${CH_NAMES[type]}: ${ch.winner.name} vence (${A} × ${D}).`, `${CH_NAMES[type]} challenge: ${ch.winner.name} wins (${A} × ${D}).`), 'chw');
-    ch.winner.won[type] = (ch.winner.won[type] || 0) + 1;
+    ch.winner.won[type] = (ch.winner.won[type] || 0) + 1; ch.loser.lost[type] = (ch.loser.lost[type] || 0) + 1;
     if (ch.winner === att) {
       if (D === 0) { this.log(LX('Desafio sem oposição (unopposed): +1 poder.', 'Unopposed challenge: +1 power.')); this.gainPower(att, 1); }
       await this.applyClaim(ch);
@@ -568,6 +612,8 @@ class Game {
     for (const f of ch.afterWinCbs) await f();
     await this.offerEvents(ch.winner, 'afterWin', ch);
     await this.offerEvents(ch.loser, 'afterLose', ch);
+    for (const c of [...ch.winner.discard]) if (ab(c).fromDiscardAfterWin && this.canTrigger(ch.winner)) await ab(c).fromDiscardAfterWin(this, c, ch);
+    await this.flushPending(); await this.checkZero();
     this.cleanupChallenge();
     this.checkWin();
     await this.informChallenge(ch, mc, A, D);
@@ -584,6 +630,14 @@ class Game {
       await p.ctrl.inform(this, p, { title, lines, tone });
     }
   }
+  // força de um lado do desafio (Traitor to the Crown, The Red Keep)
+  sideStr(ch, side) {
+    const list = side === 'att' ? ch.attackers : ch.defenders, p = side === 'att' ? ch.att : ch.def;
+    let s = 0;
+    for (const c of list) if (c.zone === 'chars') { if (ch.type === 'power' && c.att.some(a => a.code === '08009')) continue; s += this.str(c); }
+    if (list.some(c => c.zone === 'chars')) for (const o of this.inPlay(p)) if (!this.blank(o) && ab(o).sideStr) s += ab(o).sideStr(this, o, ch) || 0;
+    return s;
+  }
   sumStr(list) { return list.filter(c => c.zone === 'chars').reduce((s, c) => s + this.str(c), 0); }
   claimValue(ch) {
     let v = ch.att.plot ? ch.att.plot.d.p[2] : 1;
@@ -595,8 +649,17 @@ class Game {
   async applyClaim(ch) {
     const n = this.claimValue(ch), L = ch.loser, W = ch.winner;
     if (n <= 0) return;
-    this.log(`Claim ${n} (${CH_NAMES[ch.type]}).`);
-    if (ch.type === 'military') {
+    let ctype = ch.type;
+    if (L === ch.def && ctype !== 'power') {
+      const mya = L.chars.find(c => c.code === '08117' && !c.kneel && !this.blank(c));
+      if (mya && this.canTrigger(L)) {
+        const lossOther = ctype === 'military' ? Math.min(...L.chars.map(c => AI.value(this, c))) * n : Math.min(n, L.hand.length) * 2.2;
+        const v = await L.ctrl.chooseOption(this, L, { prompt: LX(`Mya Stone: ajoelhar para aplicar claim de Poder em vez de ${CH_NAMES[ctype]}?`, `Mya Stone: kneel to apply Power claim instead of ${CH_NAMES[ctype]}?`), options: [{ label: LX('Sim', 'Yes'), value: true }, { label: LX('Não', 'No'), value: false }], ai: o => o.value === (lossOther > Math.min(n, L.power) * 5 || L.power === 0) ? 1 : 0, card: mya });
+        if (v) { mya.kneel = true; ctype = 'power'; this.log(LX('Mya Stone: o claim passa a ser de Poder.', 'Mya Stone: claim becomes Power.')); }
+      }
+    }
+    this.log(`Claim ${n} (${CH_NAMES[ctype]}).`);
+    if (ctype === 'military') {
       for (let i = 0; i < n; i++) {
         const cands = L.chars.filter(c => !(ch.killedByClaim || []).includes(c));
         if (!cands.length) break;
@@ -604,11 +667,12 @@ class Game {
         (ch.killedByClaim = ch.killedByClaim || []).push(v);
         await this.kill(v);
       }
-    } else if (ch.type === 'intrigue') {
+    } else if (ctype === 'intrigue') {
       for (let i = 0; i < n && L.hand.length; i++) { const c = L.hand[Math.floor(Math.random() * L.hand.length)]; this.discardFromHand(L, c); this.log(LX(`${L.name} descarta ao acaso: ${this.cn(c)}.`, `${L.name} discards at random: ${this.cn(c)}.`)); }
     } else {
       this.movePower(L, W, n);
     }
+    await this.flushPending();
     this.emit();
   }
   async keywords(ch) {
@@ -624,7 +688,7 @@ class Game {
           if (k) { k.kneel = true; intimDone = true; this.log(LX(`${this.cn(c)} intimida ${this.cn(k)} (ajoelhada).`, `${this.cn(c)} intimidates ${this.cn(k)} (knelt).`)); }
         }
       }
-      if (this.hasKw(c, 'pillage')) { this.log(`Pillage (${this.cn(c)}):`); this.discardTop(L); }
+      if (this.hasKw(c, 'pillage')) { this.log(`Pillage (${this.cn(c)}):`); this.discardTop(L); await this.flushPending(); }
       if (this.hasKw(c, 'renown')) this.gainPower(W, 1, c);
     }
   }
@@ -648,34 +712,47 @@ class Game {
   // ---------- dominance ----------
   domStr(p) {
     let s = p.gold;
-    for (const c of p.chars) if (!c.kneel) s += this.str(c);
+    for (const c of p.chars) if (!c.kneel && !c.flags.noDom && !c.att.some(a => a.code === '08009')) s += this.str(c);
     for (const c of this.inPlay(p)) if (!this.blank(c) && ab(c).domStr) s += ab(c).domStr(this, c);
     return s;
   }
   async dominancePhase() {
     const m0 = this.mark();
-    this.phase = 'dominance'; this.log('— Dominance —', 'phase');
+    this.phase = 'dominance'; this.log('— Dominance —', 'phase'); await this.fire('onPhaseBegin', 'dominance');
     await this.actionRound({ phase: 'dominance' }, this.first, LX('Dominance: ações antes de calcular?', 'Dominance: actions before it is determined?'));
     const [a, b] = this.players; const da = this.domStr(a), db = this.domStr(b);
     this.log(`Dominance: ${a.name} ${da} × ${b.name} ${db}.`);
     if (da !== db) {
       const w = da > db ? a : b; this.log(LX(`${w.name} ganha dominance.`, `${w.name} wins dominance.`), 'chw'); this.gainPower(w, 1);
       if (this.myPlot(w, '01002')) { this.log('A Feast for Crows:'); this.gainPower(w, 2); }
+      w.flags.wonDominance = true;
+      await this.fire('afterWinDominance', w);
     } else this.log(LX('Empate: ninguém ganha dominance.', 'Tie: nobody wins dominance.'));
     await this.fire('onDominanceEnd');
+    await this.checkZero();
     await this.inform(da === db ? LX('Dominance: empate', 'Dominance: tie') : LX(`Dominance: ${(da > db ? a : b).name} ganha`, `Dominance: ${(da > db ? a : b).name} wins`), m0, da === db ? '' : ((da > db ? a : b).ctrl.inform ? 'good' : 'bad'));
     await this.endPhase();
   }
   async standingPhase() {
     this.mEnd = this.mark();
-    this.phase = 'standing'; this.log('— Standing —', 'phase');
+    this.phase = 'standing'; this.log('— Standing —', 'phase'); await this.fire('onPhaseBegin', 'standing');
     const stood = [];
-    for (const p of this.players) { p.fknelt = false; for (const c of this.inPlay(p)) if (c.kneel) { c.kneel = false; stood.push(c); } }
+    const stannis = this.allChars().some(c => c.code === '01052' && !this.blank(c));
+    for (const p of this.players) {
+      p.fknelt = false;
+      let chars = p.chars.filter(c => c.kneel && this.canStand(c));
+      if (stannis && chars.length > 2) {
+        chars = await p.ctrl.chooseCards(this, p, { prompt: LX('Stannis Baratheon: escolhe até 2 personagens para levantar', 'Stannis Baratheon: choose up to 2 characters to stand'), cands: chars, min: 2, max: 2, ai: x => this.str(x) + AI.value(this, x) });
+        this.log(LX(`Stannis: ${p.name} só levanta ${chars.map(c => this.cn(c)).join(', ')}.`, `Stannis: ${p.name} only stands ${chars.map(c => this.cn(c)).join(', ')}.`));
+      }
+      for (const c of chars) { c.kneel = false; stood.push(c); }
+      for (const c of [...p.locs, ...this.attsOf(p)]) if (c.kneel && this.canStand(c) && !(ab(c).standOnlyIfDominance && !this.blank(c) && !p.flags.wonDominance)) c.kneel = false;
+    }
     for (const c of stood) if (c.zone === 'chars' && !this.blank(c) && ab(c).afterStand && this.canTrigger(c.owner)) await ab(c).afterStand(this, c);
     await this.endPhase();
   }
   async taxationPhase() {
-    this.phase = 'taxation'; this.log('— Taxation —', 'phase');
+    this.phase = 'taxation'; this.log('— Taxation —', 'phase'); await this.fire('onPhaseBegin', 'taxation');
     for (const p of this.players) p.gold = 0;
     for (const p of this.order()) {
       const r = this.reserve(p); const over = p.hand.length - r;

@@ -145,7 +145,7 @@ Object.assign(AB, {
     ev: { timing: 'action', cost: () => 0,
       cond: (g, p, ctx) => g.phase === 'challenges' && !ctx.reaction && !p.fknelt && p.chars.some(c => c.d.f === 'lannister' && isLordLady(c)) && p.opp.chars.some(c => (c.d.cost || 0) <= p.gold),
       ai: (g, p) => AI.tidflScore(g, p),
-      run: async (g, p) => { const t = p.opp.chars.filter(c => (c.d.cost || 0) <= p.gold); if (!t.length) return; p.fknelt = true; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('The Things I Do For Love: escolhe a personagem a devolver', 'The Things I Do For Love: choose the character to return'), cands: t, min: 1, max: 1, ai: x => AI.value(g, x) }); p.gold -= (c.d.cost || 0); g.log(LX(`(${p.name} paga X=${c.d.cost || 0})`, `(${p.name} pays X=${c.d.cost || 0})`), 'dim'); g.returnToHand(c); } } },
+      run: async (g, p) => { const t = p.opp.chars.filter(c => (c.d.cost || 0) <= p.gold); if (!t.length) return; p.fknelt = true; const [c] = await p.ctrl.chooseCards(g, p, { prompt: LX('The Things I Do For Love: escolhe a personagem a devolver', 'The Things I Do For Love: choose the character to return'), cands: t, min: 1, max: 1, ai: x => AI.value(g, x) }); p.gold -= (c.d.cost || 0); g.log(LX(`(${p.name} paga X=${c.d.cost || 0})`, `(${p.name} pays X=${c.d.cost || 0})`), 'dim'); await g.returnToHand(c); } } },
 });
 
 // ---------------- STARK ----------------

@@ -8,7 +8,7 @@ async def main():
         pg = await b.new_page(viewport={'width':1500,'height':900})
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto('file://' + os.path.abspath('index.html')); await pg.wait_for_timeout(300)
-        await pg.select_option('#lbSpd','80'); await pg.click('#lbGo')
+        await pg.select_option('#lbSpd','80'); await pg.select_option('#lbMe', os.environ.get('ME','0')); await pg.select_option('#lbAi', os.environ.get('OPP','1')); await pg.click('#lbGo')
         kinds={}; shots=set()
         for step in range(4000):
             st = await pg.evaluate('''() => { const P=UI.pending; const g=UI.game; if(!g) return 'nogame'; if(g.phase==='end') return 'end'; if(!P) return 'wait'; return P.kind + '|' + (P.modal?'m':'') + '|' + (P.title||P.prompt||'').slice(0,30); }''')

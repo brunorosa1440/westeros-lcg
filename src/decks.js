@@ -60,8 +60,8 @@ function importDeck(text) {
     for (const l of lines) {
       const low = l.toLowerCase();
       if (!dk.faction && FACTION_ALIASES[low]) { dk.faction = FACTION_ALIASES[low]; continue; }
-      const m = l.match(/^(\d+)\s*x?\s+(.+?)(\s+\([^)]*\))?$/i);
-      if (m) { const n = +m[1]; const nm = m[2].trim(); const c = byName(nm); if (c) { if (DB[c].t === 'agenda') dk.agenda = c; else dk.cards[c] = (dk.cards[c] || 0) + n; } else missing.push(`${n}x ${nm}`); continue; }
+      const m = l.match(/^(\d+)\s*x?\s+(.+?)(?:\s+\(([^)]*)\))?$/i);
+      if (m) { const n = +m[1]; const nm = m[2].trim(); const pack = (m[3] || '').trim().toLowerCase(); const c = (pack && NAME_PACK_IDX[nm.toLowerCase() + '|' + pack]) || byName(nm); if (c) { if (DB[c].t === 'agenda') dk.agenda = c; else dk.cards[c] = (dk.cards[c] || 0) + n; } else missing.push(`${n}x ${nm}`); continue; }
       const c = byName(l.replace(/\s+\([^)]*\)$/, '')); if (c && DB[c].t === 'agenda') dk.agenda = c;
     }
     if (!dk.faction) { const cnt = {}; for (const [c, n] of Object.entries(dk.cards)) if (DB[c].f !== 'neutral') cnt[DB[c].f] = (cnt[DB[c].f] || 0) + n; dk.faction = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'stark'; }
