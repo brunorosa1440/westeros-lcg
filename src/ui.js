@@ -1,5 +1,6 @@
 // ================= INTERFACE (PT / EN) =================
 const $ = s => document.querySelector(s);
+const isMobile = () => matchMedia('(max-width: 820px)').matches;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const KW_PT = i18nObj({ renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'Sem anexos', terminal: 'Terminal' },
   { renown: 'Renown', stealth: 'Stealth', insight: 'Insight', intimidate: 'Intimidate', pillage: 'Pillage', limited: 'Limited', noAttach: 'No attachments', terminal: 'Terminal' });
@@ -10,7 +11,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v0.9';
+const APP_VERSION = 'v1.0';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -127,6 +128,7 @@ class HumanCtrl {
 }
 
 const UI = {
+  ppOpen: new Set(), longPressed: false,
   game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play', pauseInfo: store.get('agot_pause', true), logOpen: store.get('agot_log', true),
   decks: [], cur: null, curIdx: -1,
   filt: { type: 'character', fac: 'mine', q: '', auto: false, pack: 'all' },
@@ -143,6 +145,19 @@ const UI = {
     $('#pauseBtn').onclick = () => { this.pauseInfo = !this.pauseInfo; store.set('agot_pause', this.pauseInfo); this.refreshAll(); };
     $('#kwBtn').onclick = () => this.keywordsModal();
     $('#logToggle').onclick = () => { this.logOpen = !this.logOpen; store.set('agot_log', this.logOpen); this.applyLog(); };
+    $('#menuBtn').onclick = () => document.body.classList.toggle('menuopen');
+    document.querySelectorAll('#hdrBtns button').forEach(b => b.addEventListener('click', () => document.body.classList.remove('menuopen')));
+    $('#game').addEventListener('click', e => { if ($('#game').classList.contains('showlog') && !e.target.closest('#gright') && e.target.id !== 'mLog') { $('#game').classList.remove('showlog'); e.stopPropagation(); } }, true);
+    $('#sheet').onclick = e => { if (e.target.id === 'sheet' || e.target.closest('.sheetclose')) $('#sheet').classList.remove('open'); };
+    // toque longo = ver carta (telemóvel)
+    let lpT = null, lpX = 0, lpY = 0;
+    document.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const el = e.target.closest('[data-uid],[data-code]'); if (!el) return; lpX = e.clientX; lpY = e.clientY;
+      lpT = setTimeout(() => { lpT = null; this.longPressed = true; setTimeout(() => this.longPressed = false, 700); if (el.dataset.uid) { const c = this.cardMap.get(+el.dataset.uid); if (c) this.sheet(c.d, c); } else if (DB[el.dataset.code]) this.sheet(DB[el.dataset.code], null); }, 450); });
+    const lpCancel = e => { if (lpT && (!e || e.type !== 'pointermove' || Math.hypot(e.clientX - lpX, e.clientY - lpY) > 10)) { clearTimeout(lpT); lpT = null; } };
+    ['pointerup', 'pointercancel', 'pointermove'].forEach(t => document.addEventListener(t, lpCancel));
+    document.addEventListener('contextmenu', e => { if (isMobile() && e.target.closest('[data-uid],[data-code]')) e.preventDefault(); });
+    // construtor/ajuda no telemóvel: tocar no nome da carta abre os detalhes
+    document.addEventListener('click', e => { if (!isMobile() || this.longPressed) return; if (e.target.closest('button,select,input,#game')) return; const k = e.target.closest('[data-code]'); if (k && DB[k.dataset.code]) this.sheet(DB[k.dataset.code], null); });
     document.addEventListener('keydown', e => { if (this.pending && this.pending.kind === 'info' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.resolve(); } });
     this.applyLog();
     this.selectDeck(0, true);
@@ -166,6 +181,7 @@ const UI = {
     this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
     if (this.game) this.render();
   },
+  sheet(d, inst) { const s = $('#sheet'); s.innerHTML = `<div class="sheetbox"><button class="sheetclose">✕</button>${previewHTML(d, inst)}</div>`; s.classList.add('open'); },
   toast(msg, tone) { let box = $('#toasts'); if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); } const t = document.createElement('div'); t.className = 'toast ' + (tone || ''); t.textContent = msg; box.appendChild(t); setTimeout(() => t.remove(), 9000); t.onclick = () => t.remove(); },
   applyLog() { const g = $('#gright'); if (!g) return; g.classList.toggle('nolog', !this.logOpen); $('#logToggle').textContent = this.logOpen ? LX('▾ Esconder log', '▾ Hide log') : LX('▸ Mostrar log', '▸ Show log'); },
   keywordsModal() {
@@ -269,12 +285,12 @@ const UI = {
     [...me.chars, ...me.locs, ...op.chars, ...op.locs, ...me.hand].forEach(c => { visible.add(c.uid); c.att.forEach(a => visible.add(a.uid)); });
     const pp = (p, mine) => {
       const plot = p.plot ? (reg(p.plot), cardHTML(p.plot.d, p.plot)) : `<span class="note">${LX('Sem plot revelado', 'No plot revealed')}</span>`;
-      return `<div class="pp ${mine ? 'me' : ''}"><div class="nm"><span>${esc(p.name)}${g.first === p ? ` <small title="${LX('Primeiro jogador', 'First player')}" style="font-size:11px;color:#ffd36a">★1º</small>` : ''}</span><span class="fbadge f-${p.faction} ${p.fknelt ? 'kn' : ''}" style="--fc:var(--f-${p.faction})">${FACTION_NAMES[p.faction]}</span></div>
+      return `<div class="pp ${mine ? 'me' : ''} ${this.ppOpen.has(p.i) ? 'open' : ''}" data-pp="${p.i}"><div class="nm"><span>${esc(p.name)}${g.first === p ? ` <small title="${LX('Primeiro jogador', 'First player')}" style="font-size:11px;color:#ffd36a">★1º</small>` : ''}</span><span class="fbadge f-${p.faction} ${p.fknelt ? 'kn' : ''}" style="--fc:var(--f-${p.faction})">${FACTION_NAMES[p.faction]}</span></div>
       <div class="stats"><span class="stat p" title="${LX('Poder total', 'Total power')}">⚑ ${g.totalPower(p)}/15</span><span class="stat g" title="${LX('Ouro', 'Gold')}">💰 ${p.gold}</span><span class="stat" title="${LX('Mão', 'Hand')}">✋ ${p.hand.length}</span>${p.plot ? (() => { const base = p.plot.d.p[2]; const cur = g.ch && g.ch.att === p ? g.claimValue(g.ch) : base; return `<span class="stat ${cur > base ? 'up' : cur < base ? 'down' : ''}" title="Claim${cur !== base ? LX(' (base ', ' (base ') + base + ')' : ''}">⚔ Claim ${cur}</span><span class="stat" title="Reserve">📜 ${LX('Reserve', 'Reserve')} ${g.reserve(p)}</span>`; })() : ''}${p.agenda ? `<span class="stat" data-code="${p.agenda}">${esc(DB[p.agenda].n)}</span>` : ''}</div>
       <div class="piles"><button data-pile="deck" data-p="${p.i}">${LX('Baralho', 'Deck')} ${p.deck.length}</button><button data-pile="discard" data-p="${p.i}">${LX('Descarte', 'Discard')} ${p.discard.length}</button><button data-pile="dead" data-p="${p.i}">${LX('Mortos', 'Dead')} ${p.dead.length}</button><button data-pile="used" data-p="${p.i}">Plots ${p.plots.length} (${LX('usados', 'used')} ${p.used.length})</button></div>
-      <div class="mini-plot">${plot}</div></div>`;
+      <div class="mini-plot">${plot}</div><div class="ppmore">${this.ppOpen.has(p.i) ? '▴' : '▾'} ${LX('pilhas e plot', 'piles & plot')}</div></div>`;
     };
-    $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
+    $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span><span class="mobonly pbtns"><button id="mLog">📜 Log</button><button id="mQuit" class="warn">✕</button></span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
     let chb = '';
     if (ch) chb = `<div class="chb">⚔ ${CH_NAMES[ch.type]} · <span class="a">${esc(ch.att.name)} ${g.sideStr(ch, 'att')}</span> × <span class="d">${esc(ch.def.name)} ${g.sideStr(ch, 'def')}</span> · claim ${g.claimValue(ch)}</div>`;
     $('#board').innerHTML = `
@@ -324,18 +340,24 @@ const UI = {
     $('#gcenter').onclick = e => this.onCardClick(e, actMap);
     $('#gside').onclick = e => {
       const b = e.target.closest('[data-pile]'); if (b) return this.showPile(g.players[+b.dataset.p], b.dataset.pile);
-      if (e.target.id === 'btnQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
+      if (isMobile() && e.target.closest('.ppmore')) { const i = +e.target.closest('[data-pp]').dataset.pp; if (this.ppOpen.has(i)) this.ppOpen.delete(i); else this.ppOpen.add(i); return this.render(); }
+      if (e.target.id === 'mLog') { $('#game').classList.toggle('showlog'); const lg = $('#log'); lg.scrollTop = lg.scrollHeight; return; }
+      if (e.target.id === 'btnQuit' || e.target.id === 'mQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
       this.onCardClick(e, actMap);
     };
   },
   onCardClick(e, actMap) {
     const el = e.target.closest('[data-uid]'); if (!el) return;
-    const uid = +el.dataset.uid; const c = this.cardMap.get(uid); const P = this.pending; if (!P || !c) return;
+    if (this.longPressed) { this.longPressed = false; return; }
+    const uid = +el.dataset.uid; const c = this.cardMap.get(uid); const P = this.pending;
+    if (c && isMobile()) { const interactive = P && ((P.kind === 'select' && P.cands.includes(c)) || (P.kind === 'action' && actMap.get(uid))); if (!interactive) return this.sheet(c.d, c); }
+    if (!P || !c) return;
     if (P.kind === 'select') this.toggleSel(P, c);
     else if (P.kind === 'action') {
       const acts = actMap.get(uid); if (!acts) return;
       if (acts.length === 1) return this.resolve(acts[0]);
-      const m = document.createElement('div'); m.className = 'menu'; m.style.left = Math.min(e.clientX, innerWidth - 260) + 'px'; m.style.top = Math.min(e.clientY, innerHeight - 40 * acts.length - 20) + 'px';
+      const m = document.createElement('div'); m.className = 'menu'; m.style.left = Math.max(8, Math.min(e.clientX, innerWidth - 260)) + 'px'; m.style.top = Math.max(8, Math.min(e.clientY, innerHeight - 44 * (acts.length + 1) - 20)) + 'px';
+      if (isMobile()) { const b = document.createElement('button'); b.textContent = '🔍 ' + LX('Ver carta', 'View card'); b.onclick = () => { m.remove(); this.sheet(c.d, c); }; m.appendChild(b); }
       acts.forEach(a => { const b = document.createElement('button'); b.textContent = a.label; b.onclick = () => { m.remove(); this.resolve(a); }; m.appendChild(b); });
       document.body.appendChild(m);
     }

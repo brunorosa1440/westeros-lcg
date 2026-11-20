@@ -14,7 +14,7 @@ header h1{font-family:'Cinzel',serif;font-size:20px;margin:0;letter-spacing:2px;
 header nav{display:flex;gap:4px}
 header nav button{background:none;border:none;color:var(--gold);font-family:'Cinzel',serif;font-size:15px;padding:6px 10px}
 header nav button.on{color:#fff;border-bottom:2px solid var(--gold)}
-.screen{display:none;height:calc(100vh - 47px)}
+.screen{display:none;height:calc(100vh - 47px);height:calc(100dvh - 47px)}
 .screen.on{display:flex}
 /* ---------- cartas ---------- */
 .card{position:relative;width:90px;height:132px;border-radius:7px;background:#e9dfc6;color:#1d1a14;border:2px solid #222;box-shadow:0 2px 6px #0009;overflow:hidden;user-select:none;flex:none;transition:transform .15s}
@@ -183,3 +183,89 @@ tr:hover td{background:#ffffff06}
 .kwlist{max-width:640px;columns:1}
 .kwlist b{color:var(--gold2)}.kwlist p{margin:2px 0 10px;line-height:1.45}
 #pauseBtn,#kwBtn{padding:4px 10px;font-size:12px}
+
+/* ---------- telemóvel ---------- */
+#menuBtn,#logFab,.ppmore,.mobonly{display:none}
+#hdrBtns{display:flex;gap:6px}
+#sheet{display:none}
+@media (max-width:820px){
+  body{font-size:12px}
+  header{gap:8px;padding:6px 8px;position:relative}
+  header h1{font-size:14px;letter-spacing:1px}
+  header nav button{font-size:12px;padding:4px 6px}
+  #tagline{display:none}
+  #menuBtn{display:block;margin-left:auto;padding:4px 10px;font-size:16px}
+  #hdrBtns{display:none;position:absolute;right:6px;top:42px;z-index:70;flex-direction:column;background:#15171e;border:1px solid var(--gold);border-radius:10px;padding:8px;box-shadow:0 8px 24px #000}
+  body.menuopen #hdrBtns{display:flex}
+  #hdrBtns button{padding:10px 14px;font-size:14px;text-align:left}
+  .screen{height:calc(100vh - 41px);height:calc(100dvh - 41px)}
+  /* jogo */
+  #game{flex-direction:column}
+  #gside{width:auto;flex-direction:row;flex-wrap:wrap;gap:4px;padding:4px;border-right:none;border-bottom:1px solid var(--line);overflow:visible;flex:none}
+  #gside .pp{flex:1 1 40%;padding:5px 6px;min-width:0}
+  #gside .pp .nm{font-size:12px}
+  #gside .pp .stats{margin:3px 0 0;gap:3px}
+  #gside .stat{padding:1px 5px;font-size:11px}
+  #gside .pp .piles,#gside .pp .mini-plot,#gside .pp .stat[data-code]{display:none}
+  #gside .pp.open .piles,#gside .pp.open .mini-plot{display:flex;margin-top:4px}
+  #gside .ppmore{display:block;font-size:10px;color:var(--dim);margin-top:2px;cursor:pointer}
+  #gside .phasebox{order:-1;flex:1 1 100%;padding:2px 6px;display:flex;justify-content:center;gap:10px;align-items:center}
+  #gside .phasebox b{font-size:12px}
+  #btnQuit{display:none}
+  .mobonly{display:inline-flex;gap:6px;margin-left:auto}
+  .pbtns button{padding:3px 10px;font-size:12px}
+  #gcenter{flex:1;min-height:0}
+  #board{padding:4px;gap:2px}
+  #board .row{flex-wrap:nowrap;overflow-x:auto;min-height:96px;gap:4px;-webkit-overflow-scrolling:touch}
+  #board .row.locs{min-height:70px}
+  #board .row .lbl{display:none}
+  #board .slot,#hand .card,.cgrid .card{zoom:.68}
+  .divider{min-height:26px;margin:0}
+  .chb{font-size:11px;padding:3px 10px}
+  #prompt{padding:6px 8px;gap:6px;min-height:0}
+  #prompt .txt{flex:1 1 100%;min-width:0;font-size:12px}
+  #prompt button{padding:8px 12px;font-size:13px}
+  #hand{min-height:0;padding:6px;gap:4px;-webkit-overflow-scrolling:touch}
+  #gright{display:none}
+  #game.showlog #gright{display:flex;position:fixed;right:0;top:41px;bottom:0;width:86vw;z-index:45;box-shadow:-10px 0 30px #000;background:#0b0c10}
+  #game.showlog #preview{display:none}
+  #logToggle{display:none}
+  #game.showlog::after{content:'';position:fixed;inset:41px 86vw 0 0;z-index:44;background:#0008}
+  .infobox{top:6px;width:96%;max-height:70%;padding:10px 12px}
+  .modal .box{max-width:96vw;padding:10px}
+  .modal.sel-modal{right:0}
+  .cgrid{gap:4px}
+  .menu button{padding:10px 12px;font-size:14px}
+  #toasts{left:8px;right:8px;top:48px;bottom:auto;align-items:stretch}
+  .toast{max-width:none}
+  /* folha de detalhes da carta */
+  #sheet{display:block;position:fixed;inset:0;z-index:80;background:#000a;opacity:0;pointer-events:none;transition:opacity .15s}
+  #sheet.open{opacity:1;pointer-events:auto}
+  #sheet .sheetbox{position:absolute;left:0;right:0;bottom:0;max-height:85vh;overflow:auto;background:var(--panel);border-top:2px solid var(--gold);border-radius:14px 14px 0 0;padding:14px 14px 24px}
+  #sheet .sheetclose{position:sticky;top:0;float:right;font-size:16px;padding:4px 10px}
+  #sheet .pvimg{max-width:62vw}
+  /* construtor de decks */
+  #decks{flex-direction:column;overflow:auto}
+  #dlist{width:auto;flex-direction:row;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line);padding:6px;flex:none}
+  #dlist .di{flex:none;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-color:var(--line)}
+  #dlist>.note{display:none}
+  #dlist>button{flex:none}
+  #pool{flex:none;padding:6px;min-height:60vh}
+  #pool .tbl{max-height:60vh}
+  #pool table th:nth-child(5),#pool table td:nth-child(5),#pool table th:nth-child(2) small,#pool td small.note{display:none}
+  #pool table td,#pool table th{padding:4px 3px}
+  .qty button{padding:6px 9px}
+  #dside{width:auto;border-left:none;border-top:1px solid var(--line)}
+  #dside>.pvbox{display:none}
+  .pgrid .card.big{zoom:.75}
+  /* lobby / ajuda */
+  .wrap{padding:10px}
+  .panel{padding:12px}
+  .autolist{columns:1}
+  .help .panel[style*="sticky"]{display:none}
+}
+@media (max-width:820px) and (orientation:landscape){
+  #gside .pp .stats .stat:nth-child(n+4){display:none}
+  #board .slot,#hand .card{zoom:.55}
+  #board .row{min-height:78px}
+}
