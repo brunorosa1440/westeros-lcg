@@ -1,6 +1,6 @@
 // IA nova vs IA base, alternando lugares e decks
 const fs=require('fs');
-eval(['src/cards.js','src/engine.js','src/abilities.js','src/abilities_en.js','src/ai.js','src/ai2.js','src/decks.js','src/abilities_intro.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n')+`
+eval(['src/cards.js','src/engine.js','src/abilities.js','src/abilities_en.js','src/ai.js','src/ai2.js','src/decks.js','src/abilities_intro.js','src/abilities_nw.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n')+`
 (async()=>{ if(process.argv[3]) Object.assign(AIK, JSON.parse(process.argv[3]));
  const N=+process.argv[2]||200; let nw=0, rounds=0, t0=Date.now();
  for(let i=0;i<N;i++){

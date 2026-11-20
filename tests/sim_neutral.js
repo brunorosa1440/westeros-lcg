@@ -1,5 +1,5 @@
 const fs=require('fs');
-eval(['src/cards.js','src/engine.js','src/abilities.js','src/abilities_en.js','src/ai.js','src/ai2.js','src/decks.js','src/abilities_intro.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n')+`
+eval(['src/cards.js','src/engine.js','src/abilities.js','src/abilities_en.js','src/ai.js','src/ai2.js','src/decks.js','src/abilities_intro.js','src/abilities_nw.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n')+`
 class RandCtrl{ async chooseCards(g,p,o){ if(o.aiPick&&Math.random()<.5) return o.aiPick(); if(!o.cands.length) return []; const c=shuffle([...o.cands]); const n=o.min+Math.floor(Math.random()*(Math.min(o.max,c.length)-o.min+1)); return c.slice(0,n);} 
  async chooseOption(g,p,o){ return o.options[Math.floor(Math.random()*o.options.length)].value; }
  async actionWindow(g,p,o){ const r=Math.random(); if(o.buttons&&o.buttons.length&&r<0.5) return {button:o.buttons[Math.floor(Math.random()*o.buttons.length)].value}; if(o.actions.length&&r<0.85) return o.actions[Math.floor(Math.random()*o.actions.length)]; return null; } }

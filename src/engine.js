@@ -76,7 +76,13 @@ class Game {
     }
     return false;
   }
-  hasTrait(c, t) { return c.d.tr.includes(t); }
+  hasTrait(c, t) {
+    if (c.d.tr.includes(t)) return true;
+    if (c.att && c.att.some(a => a.code === '07022')) { if (t === 'Ranger' && this.hasIcon(c, 'military')) return true; if (t === 'Steward' && this.hasIcon(c, 'intrigue')) return true; if (t === 'Builder' && this.hasIcon(c, 'power')) return true; }
+    return false;
+  }
+  isFaction(c, f) { return c.d.f === f || (f === 'thenightswatch' && c.att && c.att.some(a => a.code === '07022')); }
+  kneelable(c) { return !(c.code === '06017' && !this.blank(c)); }
   str(c) {
     if (c.d.t !== 'character') return 0;
     let s = (c.d.s || 0) + c.tmp + c.ph;
@@ -85,7 +91,7 @@ class Game {
     if (c.zone === 'chars') for (const o of this.auraSources()) if (o !== c) s += ab(o).strAura(this, o, c) || 0;
     return Math.max(0, s);
   }
-  auraSources() { const r = []; for (const p of this.players) for (const o of p.chars) if (ab(o).strAura && !this.blank(o)) r.push(o); return r;
+  auraSources() { const r = []; for (const p of this.players) for (const o of this.inPlay(p)) if (ab(o).strAura && !this.blank(o)) r.push(o); return r;
   }
   hasIcon(c, type) {
     const L = ICON_OF[type];
@@ -142,19 +148,19 @@ class Game {
   }
   toZone(c, z) {
     const p = c.owner; c.zone = z;
-    if (z === 'hand') p.hand.push(c); else if (z === 'deck') p.deck.unshift(c); else if (z === 'discard') p.discard.push(c); else if (z === 'dead') p.dead.push(c); else if (z === 'removed') p.removed.push(c);
+    if (z === 'hand') p.hand.push(c); else if (z === 'deckbottom') { c.zone = 'deck'; p.deck.push(c); } else if (z === 'deck') p.deck.unshift(c); else if (z === 'discard') { p.discard.push(c); if (c.d.t === 'character') (this.recentDisc = this.recentDisc || []).push(c); } else if (z === 'dead') p.dead.push(c); else if (z === 'removed') p.removed.push(c);
   }
-  resetCard(c) { c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.phIcons = ''; c.tmpKw = {}; c.tokens = 0; }
+  resetCard(c) { c.recruited = []; c.kneel = false; c.power = 0; c.tmp = 0; c.ph = 0; c.flags = {}; c.tmpIcons = ''; c.phIcons = ''; c.tmpKw = {}; c.tokens = 0; }
   // carta sai de jogo: anexos e duplicados vão para o descarte do dono
   leavePlay(c, dest) {
     // regra: anexos voltam à mão do dono (Terminal → descarte); duplicados vão para o descarte
     for (const a of [...c.att]) { this.removeFromZone(a); this.resetCard(a); const term = a.d.k?.terminal; this.toZone(a, term ? 'discard' : 'hand'); this.log(term ? LX(`${this.cn(a)} (Terminal) vai para o descarte.`, `${this.cn(a)} (Terminal) is discarded.`) : LX(`${this.cn(a)} volta para a mão de ${a.owner.name}.`, `${this.cn(a)} returns to ${a.owner.name}'s hand.`), 'dim'); }
     for (const d of [...c.dupes]) { this.removeFromZone(d); this.resetCard(d); this.toZone(d, 'discard'); }
-    this.removeFromZone(c); this.resetCard(c); this.toZone(c, dest);
+    this.removeFromZone(c); if (c.trueOwner) { c.owner = c.trueOwner; delete c.trueOwner; } this.resetCard(c); this.toZone(c, dest);
   }
   async trySave(c) {
     if (c.dupes.length) { const d = c.dupes[0]; this.removeFromZone(d); this.toZone(d, 'discard'); this.log(LX(`${this.cn(c)} é salvo ao descartar um duplicado.`, `${this.cn(c)} is saved by discarding a duplicate.`)); return true; }
-    for (const o of this.inPlay(c.owner)) if (o !== c && !this.blank(o) && ab(o).saveOther && this.canTrigger(o.owner)) { if (await ab(o).saveOther(this, o, c)) return true; }
+    for (const o of this.inPlay(c.owner)) if (!this.blank(o) && ab(o).saveOther && this.canTrigger(o.owner)) { if (await ab(o).saveOther(this, o, c)) return true; }
     const bg = c.att.find(a => a.code === '01033');
     if (bg && this.canTrigger(bg.owner)) { this.removeFromZone(bg); this.resetCard(bg); this.toZone(bg, 'discard'); this.log(LX(`${bg.owner.name} sacrifica Bodyguard para salvar ${this.cn(c)}.`, `${bg.owner.name} sacrifices Bodyguard to save ${this.cn(c)}.`)); return true; }
     return false;
@@ -167,8 +173,10 @@ class Game {
     if (c.zone !== 'chars') return false;
     let dest = 'dead';
     if (!this.blank(c) && ab(c).killedToHand) dest = 'hand';
+    if (!this.blank(c) && ab(c).killedToDeck && this.canTrigger(p)) { dest = 'deck'; this.log(LX(`${this.cn(c)}: ${p.name} ganha 2 de poder e baralha-o no baralho.`, `${this.cn(c)}: ${p.name} gains 2 power and shuffles him into the deck.`)); }
     if (dest === 'dead') for (const o of [...p.locs]) if (!this.blank(o) && ab(o).replaceKill && this.canTrigger(p) && await ab(o).replaceKill(this, o, c)) { dest = 'hand'; break; }
     this.leavePlay(c, dest);
+    if (dest === 'deck') { shuffle(c.owner.deck); this.gainPower(c.owner, 2); }
     this.log(dest === 'dead' ? LX(`☠ ${this.cn(c)} (${p.name}) foi morto.`, `☠ ${this.cn(c)} (${p.name}) is killed.`) : LX(`☠ ${this.cn(c)} (${p.name}) foi morto e volta para a mão.`, `☠ ${this.cn(c)} (${p.name}) is killed and returns to hand.`), 'kill');
     await this.afterLeave(c, 'killed');
     return true;
@@ -203,10 +211,10 @@ class Game {
     if (this.phase !== 'setup') this.checkDecks();
     return k;
   }
-  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); this.onDiscardedFromHandOrDeck(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } this.checkDecks(); return c; }
+  discardTop(p) { const c = p.deck.shift(); if (c) { c.zone = 'discard'; p.discard.push(c); if (c.d.t === 'character') (this.recentDisc = this.recentDisc || []).push(c); this.onDiscardedFromHandOrDeck(c); this.log(LX(`${p.name} descarta do topo do baralho: ${this.cn(c)}.`, `${p.name} discards from the top of their deck: ${this.cn(c)}.`)); } this.checkDecks(); return c; }
   discardFromHand(p, c) { this.removeFromZone(c); this.toZone(c, 'discard'); this.onDiscardedFromHandOrDeck(c); }
   onDiscardedFromHandOrDeck(c) { if (ab(c).fromDiscardToPlay) this.pendingIntoPlay = [...(this.pendingIntoPlay || []), c]; }
-  async flushPending() { const l = this.pendingIntoPlay || []; this.pendingIntoPlay = []; for (const c of l) if (c.zone === 'discard') { this.log(LX(`${this.cn(c)} entra em jogo em vez de ir para o descarte.`, `${this.cn(c)} enters play instead of being discarded.`)); await this.putIntoPlay(c.owner, c, 'put'); } }
+  async flushPending() { await this.offerSteal(); const l = this.pendingIntoPlay || []; this.pendingIntoPlay = []; for (const c of l) if (c.zone === 'discard') { this.log(LX(`${this.cn(c)} entra em jogo em vez de ir para o descarte.`, `${this.cn(c)} enters play instead of being discarded.`)); await this.putIntoPlay(c.owner, c, 'put'); } }
   gainPower(p, n, card) {
     if (n <= 0) return;
     if (card && this.anyPlot('09048') && !card.d.tr.includes('King') && !card.d.tr.includes('Queen')) { this.log(LX(`${this.cn(card)} não pode ganhar poder (Your King Commands It).`, `${this.cn(card)} cannot gain power (Your King Commands It).`), 'dim'); return; }
@@ -249,6 +257,7 @@ class Game {
     this.log(LX(`${p.name} ${verb} ${this.cn(c)}${c.parent ? ' em ' + this.cn(c.parent) : ''}.`, `${p.name} ${verb} ${this.cn(c)}${c.parent ? ' on ' + this.cn(c.parent) : ''}.`));
     if (how !== 'setup') {
       if (!this.blank(c) && ab(c).onEnter && this.canTrigger(p)) await ab(c).onEnter(this, c, how);
+      if (c.zone === 'chars') await this.fire('afterEnterPlay', c);
     }
     this.emit();
     return c;
@@ -375,7 +384,7 @@ class Game {
       const acts = this.availableActions(cur, ctx);
       let chosen = null;
       if (acts.length) chosen = await cur.ctrl.actionWindow(this, cur, { prompt: prompt || LX('Janela de ações', 'Action window'), actions: acts, passLabel: LX('Passar', 'Pass'), ctx });
-      if (chosen && chosen.run) { await chosen.run(); await this.flushPending(); await this.checkZero(); passes = 0; this.emit(); }
+      if (chosen && chosen.run) { await chosen.run(); await this.flushPending(); await this.checkZero(); this.checkRecruiters(); passes = 0; this.emit(); }
       else passes++;
       cur = cur.opp;
     }
@@ -383,6 +392,45 @@ class Game {
   // personagens marcadas para morrer com STR 0 (Dracarys!, Consuming Flames, Plaza of Punishment)
   async checkZero() {
     for (const c of this.allChars()) if (c.flags.dieAt0 === this.phase && this.str(c) <= 0) { this.log(LX(`${this.cn(c)} fica com STR 0 e morre.`, `${this.cn(c)} drops to 0 STR and is killed.`)); await this.kill(c); }
+  }
+  // controlo de cartas
+  takeControl(p, c) {
+    if (c.zone !== 'chars' || c.owner === p) return;
+    const from = c.owner; const i = from.chars.indexOf(c); if (i >= 0) from.chars.splice(i, 1);
+    if (!c.trueOwner) c.trueOwner = from; c.owner = p; p.chars.push(c);
+    if (c.trueOwner === p) delete c.trueOwner;
+    this.log(LX(`${p.name} toma o controlo de ${this.cn(c)}.`, `${p.name} takes control of ${this.cn(c)}.`), 'ev');
+  }
+  async putIntoPlayUnderControl(p, c) {
+    const owner = c.owner; this.removeFromZone(c);
+    if (owner !== p) { c.trueOwner = owner; c.owner = p; }
+    c.zone = 'hand'; p.hand.push(c);
+    const r = await this.putIntoPlay(p, c, 'put');
+    if (r && r.zone !== 'chars' && r.trueOwner) { r.owner = r.trueOwner; delete r.trueOwner; }
+    return r;
+  }
+  returnControl(c) {
+    if (!c.trueOwner || c.zone !== 'chars') return;
+    const from = c.owner, to = c.trueOwner; const i = from.chars.indexOf(c); if (i >= 0) from.chars.splice(i, 1);
+    c.owner = to; delete c.trueOwner; to.chars.push(c);
+    this.log(LX(`${this.cn(c)} volta ao controlo de ${to.name}.`, `${this.cn(c)} returns to ${to.name}'s control.`));
+  }
+  checkRecruiters() { for (const c of this.allChars()) if (c.recruited && c.recruited.length && !c.kneel) { for (const x of c.recruited) this.returnControl(x); c.recruited = []; } }
+  // Now My Watch Begins: personagens que foram para o descarte do adversário
+  async offerSteal() {
+    const list = (this.recentDisc || []).filter(c => c.zone === 'discard'); this.recentDisc = [];
+    if (!list.length) return;
+    for (const q of this.order()) {
+      if (!this.canTrigger(q) || this.myPlot(q, '01016')) continue;
+      const ev = q.hand.find(x => x.code === '07023'); if (!ev || q.gold < 2) continue;
+      const t = list.filter(c => c.zone === 'discard' && c.owner !== q && (c.d.cost || 0) <= 5 && !this.uniqueBlockedByDead(q, c));
+      if (!t.length) continue;
+      const [c] = await q.ctrl.chooseCards(this, q, { prompt: LX('Now My Watch Begins: pôr em jogo sob o teu controlo uma personagem descartada pelo adversário? (ou nenhuma)', "Now My Watch Begins: put a character from the opponent's discard into play under your control? (or none)"), cands: t, min: 0, max: 1, ai: x => AI.value(this, x) - 2, modal: true });
+      if (!c) continue;
+      q.gold -= 2; this.removeFromZone(ev); this.toZone(ev, 'discard'); this.log(LX(`${q.name} joga Now My Watch Begins.`, `${q.name} plays Now My Watch Begins.`), 'ev');
+      if (await this.offerCancel(q.opp, ev, 2)) continue;
+      await this.putIntoPlayUnderControl(q, c);
+    }
   }
   canStand(c) { return !(c.flags.noStand === this.phase); }
   // ---------- reações genéricas ----------
@@ -529,7 +577,7 @@ class Game {
     if (t === 'power' && this.myPlot(p, '08040')) n++;
     return n;
   }
-  canAttackWith(p, c, t) { return c.zone === 'chars' && !c.kneel && this.hasIcon(c, t); }
+  canAttackWith(p, c, t) { return c.zone === 'chars' && !c.kneel && this.hasIcon(c, t) && c.flags.noAttack !== this.phase; }
   challengeAllowed(p, t) {
     if ((p.chDone[t] || 0) >= this.maxOfType(p, t)) return false;
     const total = CH_TYPES.reduce((s, x) => s + (p.chDone[x] || 0), 0);
@@ -575,7 +623,8 @@ class Game {
     await this.fire('afterAttackersDeclared', ch);
     // stealth
     for (const c of ch.attackers) if (this.hasKw(c, 'stealth')) {
-      const t = def.chars.filter(x => !this.hasKw(x, 'stealth') && !ch.stealthed.includes(x));
+      const benjen = def.chars.some(x => x.code === '01122' && !this.blank(x));
+      const t = def.chars.filter(x => !this.hasKw(x, 'stealth') && !ch.stealthed.includes(x) && !(benjen && this.hasTrait(x, 'Ranger')));
       if (!t.length) continue;
       const [s] = await att.ctrl.chooseCards(this, att, { prompt: LX(`Stealth de ${this.cn(c)}: escolhe uma personagem que não pode defender`, `${this.cn(c)}'s stealth: choose a character that cannot defend`), cands: t, min: 0, max: 1, ai: x => AI.stealthScore(this, att, x, type) });
       if (s) { ch.stealthed.push(s); this.log(LX(`${this.cn(c)} usa stealth em ${this.cn(s)}.`, `${this.cn(c)} uses stealth on ${this.cn(s)}.`)); }
@@ -603,7 +652,7 @@ class Game {
     this.log(LX(`Desafio ${CH_NAMES[type]}: ${ch.winner.name} vence (${A} × ${D}).`, `${CH_NAMES[type]} challenge: ${ch.winner.name} wins (${A} × ${D}).`), 'chw');
     ch.winner.won[type] = (ch.winner.won[type] || 0) + 1; ch.loser.lost[type] = (ch.loser.lost[type] || 0) + 1;
     if (ch.winner === att) {
-      if (D === 0) { this.log(LX('Desafio sem oposição (unopposed): +1 poder.', 'Unopposed challenge: +1 power.')); this.gainPower(att, 1); }
+      if (D === 0) { ch.unopposed = true; this.log(LX('Desafio sem oposição (unopposed): +1 poder.', 'Unopposed challenge: +1 power.')); this.gainPower(att, 1); }
       await this.applyClaim(ch);
     }
     await this.keywords(ch);
@@ -682,7 +731,7 @@ class Game {
     for (const c of parts) {
       if (this.hasKw(c, 'insight')) { this.log(`Insight (${this.cn(c)}):`); this.draw(W, 1); }
       if (this.hasKw(c, 'intimidate') && !intimDone && W === ch.att) {
-        const t = L.chars.filter(x => !x.kneel && this.str(x) <= ch.diff);
+        const t = L.chars.filter(x => !x.kneel && this.str(x) <= ch.diff && this.kneelable(x));
         if (t.length) {
           const [k] = await W.ctrl.chooseCards(this, W, { prompt: LX(`Intimidate (${this.cn(c)}): ajoelha uma personagem com STR ≤ ${ch.diff}`, `Intimidate (${this.cn(c)}): kneel a character with STR ≤ ${ch.diff}`), cands: t, min: 0, max: 1, ai: x => AI.value(this, x) });
           if (k) { k.kneel = true; intimDone = true; this.log(LX(`${this.cn(c)} intimida ${this.cn(k)} (ajoelhada).`, `${this.cn(c)} intimidates ${this.cn(k)} (knelt).`)); }
@@ -741,6 +790,10 @@ class Game {
     for (const p of this.players) {
       p.fknelt = false;
       let chars = p.chars.filter(c => c.kneel && this.canStand(c));
+      for (const r of chars.filter(c => c.recruited && c.recruited.some(x => x.zone === 'chars' && x.owner === p) && !this.blank(c))) {
+        const keep = await p.ctrl.chooseOption(this, p, { prompt: LX(`${this.cn(r)}: deixar ajoelhado para manter o controlo de ${r.recruited.map(x => this.cn(x)).join(', ')}?`, `${this.cn(r)}: leave knelt to keep control of ${r.recruited.map(x => this.cn(x)).join(', ')}?`), options: [{ label: LX('Manter ajoelhado', 'Keep knelt'), value: true }, { label: LX('Levantar', 'Stand'), value: false }], ai: o => o.value ? 1 : 0, card: r });
+        if (keep) chars = chars.filter(c => c !== r);
+      }
       if (stannis && chars.length > 2) {
         chars = await p.ctrl.chooseCards(this, p, { prompt: LX('Stannis Baratheon: escolhe até 2 personagens para levantar', 'Stannis Baratheon: choose up to 2 characters to stand'), cands: chars, min: 2, max: 2, ai: x => this.str(x) + AI.value(this, x) });
         this.log(LX(`Stannis: ${p.name} só levanta ${chars.map(c => this.cn(c)).join(', ')}.`, `Stannis: ${p.name} only stands ${chars.map(c => this.cn(c)).join(', ')}.`));
@@ -748,6 +801,7 @@ class Game {
       for (const c of chars) { c.kneel = false; stood.push(c); }
       for (const c of [...p.locs, ...this.attsOf(p)]) if (c.kneel && this.canStand(c) && !(ab(c).standOnlyIfDominance && !this.blank(c) && !p.flags.wonDominance)) c.kneel = false;
     }
+    this.checkRecruiters();
     for (const c of stood) if (c.zone === 'chars' && !this.blank(c) && ab(c).afterStand && this.canTrigger(c.owner)) await ab(c).afterStand(this, c);
     await this.endPhase();
   }
@@ -759,9 +813,11 @@ class Game {
       if (over > 0) {
         const cs = await p.ctrl.chooseCards(this, p, { prompt: LX(`Reserve ${r}: descarta ${over} carta${over > 1 ? 's' : ''} da mão`, `Reserve ${r}: discard ${over} card${over > 1 ? 's' : ''} from your hand`), cands: [...p.hand], min: over, max: over, ai: x => -AI.handValue(this, p, x) });
         for (const c of cs) this.discardFromHand(p, c);
+        await this.flushPending();
         this.log(LX(`${p.name} descarta ${over} carta(s) por reserve: ${cs.map(c => this.cn(c)).join(', ')}.`, `${p.name} discards ${over} card(s) to reserve: ${cs.map(c => this.cn(c)).join(', ')}.`));
       }
     }
+    await this.fire('onTaxationEnd');
     await this.inform(LX('Fim da ronda', 'End of round'), this.mEnd);
     await this.endPhase();
   }
