@@ -7,7 +7,8 @@ function LX(pt, en) { return LANG === 'en' ? en : pt; }
 function i18nObj(pt, en) { const src = () => LANG === 'en' ? en : pt; return new Proxy({}, { get: (_, k) => src()[k], ownKeys: () => Reflect.ownKeys(pt), getOwnPropertyDescriptor: (_, k) => ({ enumerable: true, configurable: true, value: src()[k] }), has: (_, k) => k in pt }); }
 const FACTION_NAMES = i18nObj({ baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutra' },
   { baratheon: 'Baratheon', greyjoy: 'Greyjoy', lannister: 'Lannister', martell: 'Martell', thenightswatch: "Night's Watch", stark: 'Stark', targaryen: 'Targaryen', tyrell: 'Tyrell', neutral: 'Neutral' });
-const CH_NAMES = i18nObj({ military: 'Militar', intrigue: 'Intriga', power: 'Poder' }, { military: 'Military', intrigue: 'Intrigue', power: 'Power' });
+const CH_SYM = { military: '⚔', intrigue: '👁', power: '♛' };
+const CH_NAMES = i18nObj({ military: '⚔ Militar', intrigue: '👁 Intriga', power: '♛ Poder' }, { military: '⚔ Military', intrigue: '👁 Intrigue', power: '♛ Power' });
 const ICON_OF = { military: 'M', intrigue: 'I', power: 'P' };
 const CH_TYPES = ['military', 'intrigue', 'power'];
 const PHASE_NAMES = { setup: 'Setup', plot: 'Plot', draw: 'Draw', marshal: 'Marshaling', challenges: 'Challenges', dominance: 'Dominance', standing: 'Standing', taxation: 'Taxation' };
@@ -46,7 +47,13 @@ class Game {
     this.endOfPhase = []; // callbacks
   }
   // ---------- util ----------
-  log(msg, cls) { this.logs.push({ msg, cls: cls || '' }); if (this.logs.length > 400) this.logs.shift(); this.emit(); }
+  log(msg, cls) { this.logSeq = (this.logSeq || 0) + 1; this.logs.push({ msg, cls: cls || '', id: this.logSeq }); if (this.logs.length > 400) this.logs.shift(); this.emit(); }
+  mark() { return (this.logSeq || 0) + 1; }
+  async inform(title, from, tone) {
+    const lines = this.logs.filter(l => l.id >= from && l.cls !== 'phase' && l.cls !== 'dim');
+    if (!lines.length) return;
+    for (const p of this.players) if (p.ctrl.inform) await p.ctrl.inform(this, p, { title, lines, tone: tone || '' });
+  }
   emit() { if (this.onUpdate) this.onUpdate(); }
   order() { return [this.first, this.first.opp]; }
   pname(p) { return p.name; }
@@ -211,7 +218,7 @@ class Game {
       if (!target) {
         const t = this.attachTargets(p, c);
         if (!t.length) { this.toZone(c, 'discard'); this.log(LX(`${this.cn(c)} não tem alvo válido e é descartado.`, `${this.cn(c)} has no valid target and is discarded.`)); return null; }
-        [target] = await p.ctrl.chooseCards(this, p, { prompt: LX(`Escolhe a personagem onde anexar ${this.cn(c)}`, `Choose a character to attach ${this.cn(c)} to`), cands: t, min: 1, max: 1, ai: x => AI.attachScore(this, p, c, x) });
+        [target] = await p.ctrl.chooseCards(this, p, { force: true, prompt: LX(`Escolhe a personagem onde anexar ${this.cn(c)}`, `Choose a character to attach ${this.cn(c)} to`), cands: t, min: 1, max: 1, ai: x => AI.attachScore(this, p, c, x) });
       }
       c.zone = 'att'; c.parent = target; target.att.push(c);
     }
@@ -362,7 +369,14 @@ class Game {
   }
   async setup() {
     this.phase = 'setup'; this.log('— Setup —', 'phase');
+    const m0 = this.mark();
     for (const p of this.players) this.draw(p, 7, true);
+    for (const p of this.players) {
+      const mul = await p.ctrl.chooseOption(this, p, { prompt: LX('Mão inicial: queres fazer mulligan (baralhar a mão de volta e comprar 7 novas)? Só podes fazer uma vez.', 'Opening hand: mulligan (shuffle your hand back and draw 7 new cards)? You can only do this once.'),
+        options: [{ label: LX('Manter mão', 'Keep hand'), value: false }, { label: 'Mulligan', value: true }], ai: o => o.value === AI.wantsMulligan(this, p) ? 1 : 0 });
+      if (mul) { for (const c of [...p.hand]) { this.removeFromZone(c); c.zone = 'deck'; p.deck.push(c); } shuffle(p.deck); this.draw(p, 7, true); this.log(LX(`${p.name} faz mulligan.`, `${p.name} takes a mulligan.`)); }
+      else this.log(LX(`${p.name} mantém a mão.`, `${p.name} keeps their hand.`));
+    }
     for (const p of this.players) {
       // escolher cartas de setup (até 8 ouro, 1 limitada, sem eventos)
       let budget = 8; let limited = 0;
@@ -386,6 +400,7 @@ class Game {
     }
     for (const p of this.players) { const n = 7 - p.hand.length; if (n > 0) this.draw(p, n); }
     this.checkDecks();
+    await this.inform('Setup', m0);
   }
   async playRound() {
     this.round++;
@@ -406,6 +421,7 @@ class Game {
     this.emit();
   }
   async plotPhase() {
+    const m0 = this.mark();
     this.phase = 'plot'; this.log(LX(`— Ronda ${this.round}: Plot —`, `— Round ${this.round}: Plot —`), 'phase');
     const chosen = [];
     for (const p of this.players) {
@@ -432,6 +448,7 @@ class Game {
       const h = ab(p.plot).reveal;
       if (h) await h(this, p, p.plot);
     }
+    await this.inform(LX('Plots revelados', 'Plots revealed'), m0);
     await this.endPhase();
   }
   async drawPhase() {
@@ -443,6 +460,7 @@ class Game {
   async marshalPhase() {
     this.phase = 'marshal'; this.log('— Marshaling —', 'phase');
     for (const p of this.order()) {
+      const mm = this.mark();
       const inc = this.income(p); p.gold += inc; this.log(LX(`${p.name} recolhe ${inc} ouro (total ${p.gold}).`, `${p.name} collects ${inc} gold (total ${p.gold}).`), 'gold');
       this.activeP = p;
       let guard = 0;
@@ -453,10 +471,11 @@ class Game {
           const dup = this.findDupeTarget(p, c);
           acts.push({ card: c, label: dup ? LX('Marshal como duplicado (0)', 'Marshal as duplicate (0)') : LX(`Marshal (${this.costOf(p, c, 'marshal')} ouro)`, `Marshal (${this.costOf(p, c, 'marshal')} gold)`), marshal: true, ai: AI.marshalScore(this, p, c), run: () => this.marshal(p, c) });
         }
-        const ch = await p.ctrl.actionWindow(this, p, { prompt: LX(`Marshaling — ouro: ${p.gold}. Escolhe cartas para jogar ou termina.`, `Marshaling — gold: ${p.gold}. Choose cards to play, or finish.`), actions: acts, passLabel: LX('Terminar marshaling', 'Done marshaling'), ctx });
+        const ch = await p.ctrl.actionWindow(this, p, { prompt: LX(`Marshaling — ouro: ${p.gold}. Escolhe cartas para jogar (anexos, personagens, locais) ou termina.`, `Marshaling — gold: ${p.gold}. Choose cards to play (attachments, characters, locations), or finish.`), actions: acts, passLabel: LX('Terminar marshaling', 'Done marshaling'), ctx });
         if (!ch) break;
         await ch.run(); this.emit();
       }
+      if (p.ctrl.isAI) await this.inform(LX(`${p.name} — marshaling`, `${p.name} — marshaling`), mm);
     }
     this.activeP = null;
     await this.endPhase();
@@ -503,9 +522,10 @@ class Game {
     const attackers = await att.ctrl.chooseCards(this, att, { prompt: LX(`Desafio ${CH_NAMES[type]}: escolhe os atacantes`, `${CH_NAMES[type]} challenge: choose attackers`), cands, min: 1, max: jousting ? 1 : cands.length, ai: null, aiPick: () => AI.pickAttackers(this, att, type, cands, jousting) });
     if (!attackers.length) return;
     att.chDone[type] = (att.chDone[type] || 0) + 1;
+    const mc = this.mark();
     const ch = this.ch = { type, att, def, attackers: [...attackers], defenders: [], claimMod: 0, stealthed: [], winner: null, loser: null, diff: 0, afterWinCbs: [] };
     for (const c of attackers) if (!(ab(c).noKneelAttack && !this.blank(c) && ab(c).noKneelAttack(this, c, type))) c.kneel = true;
-    this.log(LX(`⚔ ${att.name} inicia um desafio ${CH_NAMES[type]} com ${attackers.map(c => this.cn(c)).join(', ')}.`, `⚔ ${att.name} initiates a challenge (${CH_NAMES[type]}) with ${attackers.map(c => this.cn(c)).join(', ')}.`), 'ch');
+    this.log(LX(`${att.name} inicia um desafio ${CH_NAMES[type]} com ${attackers.map(c => this.cn(c)).join(', ')}.`, `${att.name} initiates a challenge (${CH_NAMES[type]}) with ${attackers.map(c => this.cn(c)).join(', ')}.`), 'ch');
     this.emit();
     await this.fire('afterChallengeInitiated', ch);
     // stealth
@@ -531,7 +551,7 @@ class Game {
     if (A >= D && A > 0 && ch.attackers.length) { ch.winner = att; ch.loser = def; }
     else if (D > A) { ch.winner = def; ch.loser = att; }
     ch.diff = Math.abs(A - D);
-    if (!ch.winner) { this.log(LX(`Desafio ${CH_NAMES[type]}: sem vencedor (${A} × ${D}).`, `${CH_NAMES[type]} challenge: no winner (${A} × ${D}).`), 'ch'); this.cleanupChallenge(); return; }
+    if (!ch.winner) { this.log(LX(`Desafio ${CH_NAMES[type]}: sem vencedor (${A} × ${D}).`, `${CH_NAMES[type]} challenge: no winner (${A} × ${D}).`), 'ch'); this.cleanupChallenge(); await this.informChallenge(ch, mc, A, D); return; }
     this.log(LX(`Desafio ${CH_NAMES[type]}: ${ch.winner.name} vence (${A} × ${D}).`, `${CH_NAMES[type]} challenge: ${ch.winner.name} wins (${A} × ${D}).`), 'chw');
     ch.winner.won[type] = (ch.winner.won[type] || 0) + 1;
     if (ch.winner === att) {
@@ -546,6 +566,19 @@ class Game {
     await this.offerEvents(ch.loser, 'afterLose', ch);
     this.cleanupChallenge();
     this.checkWin();
+    await this.informChallenge(ch, mc, A, D);
+  }
+  async informChallenge(ch, mc, A, D) {
+    for (const p of this.players) {
+      if (!p.ctrl.inform) continue;
+      const nm = CH_NAMES[ch.type];
+      let title, tone;
+      if (!ch.winner) { title = LX(`Desafio ${nm}: sem vencedor (${A} × ${D})`, `${nm} challenge: no winner (${A} × ${D})`); tone = ''; }
+      else if (ch.winner === p) { title = LX(`Ganhaste o desafio ${nm} (${A} × ${D})`, `You won the ${nm} challenge (${A} × ${D})`); tone = 'good'; }
+      else { title = LX(`Perdeste o desafio ${nm} (${A} × ${D})`, `You lost the ${nm} challenge (${A} × ${D})`); tone = 'bad'; }
+      const lines = this.logs.filter(l => l.id >= mc && l.cls !== 'phase' && l.cls !== 'dim');
+      await p.ctrl.inform(this, p, { title, lines, tone });
+    }
   }
   sumStr(list) { return list.filter(c => c.zone === 'chars').reduce((s, c) => s + this.str(c), 0); }
   claimValue(ch) {
@@ -580,7 +613,7 @@ class Game {
     let intimDone = false;
     for (const c of parts) {
       if (this.hasKw(c, 'insight')) { this.log(`Insight (${this.cn(c)}):`); this.draw(W, 1); }
-      if (this.hasKw(c, 'intimidate') && !intimDone) {
+      if (this.hasKw(c, 'intimidate') && !intimDone && W === ch.att) {
         const t = L.chars.filter(x => !x.kneel && this.str(x) <= ch.diff);
         if (t.length) {
           const [k] = await W.ctrl.chooseCards(this, W, { prompt: LX(`Intimidate (${this.cn(c)}): ajoelha uma personagem com STR ≤ ${ch.diff}`, `Intimidate (${this.cn(c)}): kneel a character with STR ≤ ${ch.diff}`), cands: t, min: 0, max: 1, ai: x => AI.value(this, x) });
@@ -616,6 +649,7 @@ class Game {
     return s;
   }
   async dominancePhase() {
+    const m0 = this.mark();
     this.phase = 'dominance'; this.log('— Dominance —', 'phase');
     await this.actionRound({ phase: 'dominance' }, this.first, LX('Dominance: ações antes de calcular?', 'Dominance: actions before it is determined?'));
     const [a, b] = this.players; const da = this.domStr(a), db = this.domStr(b);
@@ -625,9 +659,11 @@ class Game {
       if (this.myPlot(w, '01002')) { this.log('A Feast for Crows:'); this.gainPower(w, 2); }
     } else this.log(LX('Empate: ninguém ganha dominance.', 'Tie: nobody wins dominance.'));
     await this.fire('onDominanceEnd');
+    await this.inform(da === db ? LX('Dominance: empate', 'Dominance: tie') : LX(`Dominance: ${(da > db ? a : b).name} ganha`, `Dominance: ${(da > db ? a : b).name} wins`), m0, da === db ? '' : ((da > db ? a : b).ctrl.inform ? 'good' : 'bad'));
     await this.endPhase();
   }
   async standingPhase() {
+    this.mEnd = this.mark();
     this.phase = 'standing'; this.log('— Standing —', 'phase');
     const stood = [];
     for (const p of this.players) { p.fknelt = false; for (const c of this.inPlay(p)) if (c.kneel) { c.kneel = false; stood.push(c); } }
@@ -642,9 +678,10 @@ class Game {
       if (over > 0) {
         const cs = await p.ctrl.chooseCards(this, p, { prompt: LX(`Reserve ${r}: descarta ${over} carta${over > 1 ? 's' : ''} da mão`, `Reserve ${r}: discard ${over} card${over > 1 ? 's' : ''} from your hand`), cands: [...p.hand], min: over, max: over, ai: x => -AI.handValue(this, p, x) });
         for (const c of cs) this.discardFromHand(p, c);
-        this.log(LX(`${p.name} descarta ${over} carta(s) por reserve.`, `${p.name} discards ${over} card(s) to reserve.`));
+        this.log(LX(`${p.name} descarta ${over} carta(s) por reserve: ${cs.map(c => this.cn(c)).join(', ')}.`, `${p.name} discards ${over} card(s) to reserve: ${cs.map(c => this.cn(c)).join(', ')}.`));
       }
     }
+    await this.inform(LX('Fim da ronda', 'End of round'), this.mEnd);
     await this.endPhase();
   }
 }

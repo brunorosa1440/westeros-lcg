@@ -1,5 +1,10 @@
 // ================= IA HEURÍSTICA =================
 const AI = {
+  wantsMulligan(g, p) {
+    const chars = p.hand.filter(c => c.d.t === 'character' && (c.d.cost || 0) <= 8);
+    const cheap = chars.filter(c => (c.d.cost || 0) <= 4);
+    return chars.length < 2 || (chars.length < 3 && !cheap.length);
+  },
   value(g, c) { return (c.d.cost || 0) + (c.d.t === 'character' ? g.str(c) : 0) + 2 * c.power + (c.d.u ? 2 : 0) + c.att.length * 1.5 + c.dupes.length * 2; },
   iconsCount(g, c) { return CH_TYPES.filter(t => g.hasIcon(c, t)).length; },
   handValue(g, p, c) { if (c.d.t === 'event') return 3 + (c.d.cost === 'X' ? 2 : 0); return (c.d.cost || 0) + (c.d.s || 0) + (c.d.u && g.findDupeTarget(p, c) ? 4 : 0); },

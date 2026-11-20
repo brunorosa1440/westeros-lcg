@@ -12,7 +12,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v0.4';
+const APP_VERSION = 'v0.5';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -39,7 +39,8 @@ function imgFail(el) {
 }
 
 // ---------- desenho das cartas ----------
-function iconsHTML(str) { return [...(str || '')].map(L => `<span class="ic ${L}">${L}</span>`).join(''); }
+const ICON_SYM = { M: '⚔', I: '👁', P: '♛' };
+function iconsHTML(str) { return [...(str || '')].map(L => `<span class="ic ${L}" title="${CH_NAMES[{ M: 'military', I: 'intrigue', P: 'power' }[L]]}">${ICON_SYM[L]}</span>`).join(''); }
 function kwList(d, inst, g) {
   const out = [];
   for (const k of ['renown', 'stealth', 'insight', 'intimidate', 'pillage', 'limited', 'terminal']) if (inst && g ? g.hasKw(inst, k) : d.k?.[k]) out.push(KW_PT[k]);
@@ -116,15 +117,19 @@ class HumanCtrl {
   constructor() { this.isAI = false; }
   chooseCards(g, p, o) {
     if (!o.cands.length) return Promise.resolve([]);
-    if (o.cands.length <= o.min) return Promise.resolve([...o.cands]);
+    if (!o.force && o.cands.length <= o.min) return Promise.resolve([...o.cands]);
     return new Promise(res => UI.setPending({ kind: 'select', ...o, sel: [], resolve: res }));
   }
   chooseOption(g, p, o) { return new Promise(res => UI.setPending({ kind: 'option', ...o, resolve: res })); }
   actionWindow(g, p, o) { return new Promise(res => UI.setPending({ kind: 'action', ...o, resolve: res })); }
+  inform(g, p, o) {
+    if (!UI.pauseInfo) { UI.toast(o.title + ' — ' + o.lines.slice(-3).map(l => l.msg).join(' · '), o.tone); return Promise.resolve(); }
+    return new Promise(res => UI.setPending({ kind: 'info', ...o, resolve: res }));
+  }
 }
 
 const UI = {
-  game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play',
+  game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play', pauseInfo: store.get('agot_pause', true), logOpen: store.get('agot_log', true),
   decks: [], cur: null, curIdx: -1,
   filt: { type: 'character', fac: 'mine', q: '', auto: false },
   init() {
@@ -137,6 +142,11 @@ const UI = {
     document.addEventListener('click', e => { const m = document.querySelector('.menu'); if (m && !m.contains(e.target)) m.remove(); }, true);
     $('#langBtn').onclick = () => this.setLang(LANG === 'pt' ? 'en' : 'pt');
     $('#imgBtn').onclick = () => { IMG.on = !IMG.on; store.set('agot_img', IMG.on); this.refreshAll(); };
+    $('#pauseBtn').onclick = () => { this.pauseInfo = !this.pauseInfo; store.set('agot_pause', this.pauseInfo); this.refreshAll(); };
+    $('#kwBtn').onclick = () => this.keywordsModal();
+    $('#logToggle').onclick = () => { this.logOpen = !this.logOpen; store.set('agot_log', this.logOpen); this.applyLog(); };
+    document.addEventListener('keydown', e => { if (this.pending && this.pending.kind === 'info' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.resolve(); } });
+    this.applyLog();
     this.selectDeck(0, true);
     this.refreshAll();
     this.tab('play');
@@ -146,6 +156,10 @@ const UI = {
     document.documentElement.lang = LANG;
     $('#langBtn').textContent = LANG === 'pt' ? 'EN' : 'PT';
     $('#langBtn').title = LX('Switch to English', 'Mudar para português');
+    $('#pauseBtn').textContent = this.pauseInfo ? LX('⏸ Resumos: ligados', '⏸ Summaries: on') : LX('⏸ Resumos: desligados', '⏸ Summaries: off');
+    $('#pauseBtn').title = LX('Parar depois de cada desafio/fase para mostrar o que aconteceu', 'Pause after each challenge/phase to show what happened');
+    $('#kwBtn').textContent = 'Keywords';
+    this.applyLog();
     $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
     const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
     document.querySelectorAll('header nav button').forEach(b => b.textContent = nav[b.dataset.t]);
@@ -154,7 +168,42 @@ const UI = {
     this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
     if (this.game) this.render();
   },
-  toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 9000); t.onclick = () => t.remove(); },
+  toast(msg, tone) { let box = $('#toasts'); if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); } const t = document.createElement('div'); t.className = 'toast ' + (tone || ''); t.textContent = msg; box.appendChild(t); setTimeout(() => t.remove(), 9000); t.onclick = () => t.remove(); },
+  applyLog() { const g = $('#gright'); if (!g) return; g.classList.toggle('nolog', !this.logOpen); $('#logToggle').textContent = this.logOpen ? LX('▾ Esconder log', '▾ Hide log') : LX('▸ Mostrar log', '▸ Show log'); },
+  keywordsModal() {
+    const K = LX([
+      ['Ambush (X)', 'Durante a fase de desafios, podes pagar X ouro para pôr esta carta em jogo diretamente da mão.'],
+      ['Insight', 'Depois de ganhares um desafio em que esta personagem participa, compras 1 carta.'],
+      ['Intimidate', 'Depois de ganhares um desafio como atacante com uma personagem com intimidate, podes ajoelhar uma personagem do adversário com STR igual ou inferior à diferença com que ganhaste. Só 1 personagem por desafio.'],
+      ['Limited', 'Cada jogador só pode jogar 1 carta limited por ronda (e só 1 no setup).'],
+      ['No attachments / Sem anexos', 'Esta carta não pode ter anexos.'],
+      ['Pillage', 'Depois de ganhares um desafio em que esta personagem participa, o adversário descarta a carta do topo do baralho.'],
+      ['Renown', 'Depois de ganhares um desafio em que esta personagem participa, ela ganha 1 poder.'],
+      ['Stealth', 'Quando declaras esta personagem como atacante, escolhes uma personagem do adversário sem stealth: essa não pode defender neste desafio.'],
+      ['Terminal', 'Se a personagem anexada sair de jogo, este anexo vai para o descarte (não volta à mão).'],
+      ['Unopposed', 'Se o atacante ganhar e a força total da defesa for 0, ganha +1 poder.'],
+      ['Claim', 'Número no plot do atacante. Militar: o perdedor mata essa quantidade de personagens. Intriga: descarta essa quantidade de cartas ao acaso da mão. Poder: o atacante rouba essa quantidade de poder à facção do perdedor.'],
+      ['Reserve', 'No fim da ronda, quem tiver mais cartas na mão do que o reserve do seu plot descarta o excesso.'],
+      ['Dominance', 'Soma da STR das personagens em pé + ouro que sobrou. Quem tiver mais ganha 1 poder.'],
+      ['Duplicado', 'Uma cópia extra de uma carta única que já tens em jogo pode ser colocada por baixo dela sem custo. Se a carta fosse morta ou descartada, descartas o duplicado para a salvar.'],
+    ], [
+      ['Ambush (X)', 'During the challenges phase you may pay X gold to put this card into play straight from your hand.'],
+      ['Insight', 'After you win a challenge this character took part in, draw 1 card.'],
+      ['Intimidate', "After you win a challenge as attacker with an intimidate character, you may kneel an opponent's character whose STR is no higher than your margin of victory. Only 1 character per challenge."],
+      ['Limited', 'Each player may play only 1 limited card per round (and only 1 during setup).'],
+      ['No attachments', 'This card cannot have attachments.'],
+      ['Pillage', 'After you win a challenge this character took part in, your opponent discards the top card of their deck.'],
+      ['Renown', 'After you win a challenge this character took part in, it gains 1 power.'],
+      ['Stealth', "When you declare this character as an attacker, choose an opponent's character without stealth: it cannot defend this challenge."],
+      ['Terminal', 'If the attached character leaves play, this attachment goes to the discard pile instead of returning to hand.'],
+      ['Unopposed', "If the attacker wins and the defenders' total STR is 0, the attacker gains 1 power."],
+      ['Claim', "The number on the attacker's plot. Military: the loser kills that many characters. Intrigue: the loser discards that many random cards from hand. Power: the attacker takes that much power from the loser's faction."],
+      ['Reserve', 'At the end of the round, anyone holding more cards than their plot\'s reserve discards the excess.'],
+      ['Dominance', 'Total STR of standing characters + unspent gold. Highest total gains 1 power.'],
+      ['Duplicate', 'An extra copy of a unique card you already have in play can be placed under it for free. If the card would be killed or discarded, discard the duplicate to save it.'],
+    ]);
+    this.modal(`<div class="kwlist">${K.map(([k, v]) => `<div><b>${esc(k)}</b><p>${esc(v)}</p></div>`).join('')}</div>`, [{ label: 'OK' }], LX('Keywords e termos', 'Keywords and terms'));
+  },
   tab(t) {
     this.curTab = t;
     document.querySelectorAll('header nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -223,7 +272,7 @@ const UI = {
     const pp = (p, mine) => {
       const plot = p.plot ? (reg(p.plot), cardHTML(p.plot.d, p.plot)) : `<span class="note">${LX('Sem plot revelado', 'No plot revealed')}</span>`;
       return `<div class="pp ${mine ? 'me' : ''}"><div class="nm"><span>${esc(p.name)}${g.first === p ? ` <small title="${LX('Primeiro jogador', 'First player')}" style="font-size:11px;color:#ffd36a">★1º</small>` : ''}</span><span class="fbadge f-${p.faction} ${p.fknelt ? 'kn' : ''}" style="--fc:var(--f-${p.faction})">${FACTION_NAMES[p.faction]}</span></div>
-      <div class="stats"><span class="stat p" title="${LX('Poder total', 'Total power')}">⚑ ${g.totalPower(p)}/15</span><span class="stat g" title="${LX('Ouro', 'Gold')}">💰 ${p.gold}</span><span class="stat" title="${LX('Mão', 'Hand')}">✋ ${p.hand.length}</span>${p.agenda ? `<span class="stat" data-code="${p.agenda}">${esc(DB[p.agenda].n)}</span>` : ''}</div>
+      <div class="stats"><span class="stat p" title="${LX('Poder total', 'Total power')}">⚑ ${g.totalPower(p)}/15</span><span class="stat g" title="${LX('Ouro', 'Gold')}">💰 ${p.gold}</span><span class="stat" title="${LX('Mão', 'Hand')}">✋ ${p.hand.length}</span>${p.plot ? (() => { const base = p.plot.d.p[2]; const cur = g.ch && g.ch.att === p ? g.claimValue(g.ch) : base; return `<span class="stat ${cur > base ? 'up' : cur < base ? 'down' : ''}" title="Claim${cur !== base ? LX(' (base ', ' (base ') + base + ')' : ''}">⚔ Claim ${cur}</span><span class="stat" title="Reserve">📜 ${LX('Reserve', 'Reserve')} ${g.reserve(p)}</span>`; })() : ''}${p.agenda ? `<span class="stat" data-code="${p.agenda}">${esc(DB[p.agenda].n)}</span>` : ''}</div>
       <div class="piles"><button data-pile="deck" data-p="${p.i}">${LX('Baralho', 'Deck')} ${p.deck.length}</button><button data-pile="discard" data-p="${p.i}">${LX('Descarte', 'Discard')} ${p.discard.length}</button><button data-pile="dead" data-p="${p.i}">${LX('Mortos', 'Dead')} ${p.dead.length}</button><button data-pile="used" data-p="${p.i}">Plots ${p.plots.length} (${LX('usados', 'used')} ${p.used.length})</button></div>
       <div class="mini-plot">${plot}</div></div>`;
     };
@@ -250,6 +299,9 @@ const UI = {
       if ($('#btnOk')) $('#btnOk').onclick = () => this.resolve(P.sel);
       if ($('#btnAll')) $('#btnAll').onclick = () => { P.sel = P.cands.slice(0, P.max); this.render(); };
       if (P.modal || P.cands.some(c => !visible.has(c.uid))) this.selModal(P);
+    } else if (P.kind === 'info') {
+      pr.innerHTML = `<div class="txt">${esc(P.title)}</div><button class="pri" id="btnInfo">OK (Enter)</button>`;
+      $('#btnInfo').onclick = () => this.resolve();
     } else if (P.kind === 'option') {
       pr.innerHTML = `<div class="txt">${esc(P.prompt)}</div>` + P.options.map((o, i) => `<button class="${i === 0 ? 'pri' : ''}" data-opt="${i}">${esc(o.label)}</button>`).join('');
       pr.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => this.resolve(P.options[+b.dataset.opt].value));
@@ -261,6 +313,13 @@ const UI = {
       pr.querySelectorAll('[data-loose]').forEach(b => b.onclick = () => this.resolve(loose[+b.dataset.loose]));
       pr.querySelector('[data-pass]').onclick = () => this.resolve(null);
     }
+    let ib = $('#infoBox');
+    if (P && P.kind === 'info') {
+      if (!ib) { ib = document.createElement('div'); ib.id = 'infoBox'; $('#gcenter').appendChild(ib); }
+      ib.className = 'infobox ' + (P.tone || '');
+      ib.innerHTML = `<h3>${esc(P.title)}</h3><div class="ilines">${P.lines.map(l => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('')}</div><button class="pri" id="btnInfo2">OK</button>`;
+      $('#btnInfo2').onclick = () => this.resolve();
+    } else if (ib) ib.remove();
     const lg = $('#log'); const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 40;
     lg.innerHTML = g.logs.map(l => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('');
     if (atBottom) lg.scrollTop = lg.scrollHeight;
