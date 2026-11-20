@@ -1422,7 +1422,7 @@ function imgFail(el) {
   const code = el.dataset.img, i = +el.dataset.try + 1, u = IMG.urls(code);
   if (i < u.length) { el.dataset.try = i; el.src = u[i]; return; }
   IMG.broken.add(code); IMG.fails++; el.remove();
-  if (IMG.fails >= 6 && IMG.oks === 0 && !IMG.warned) { IMG.warned = true; const t = IMG.urls('01090')[0]; UI.toast(LX(`As imagens das cartas não carregaram. Testa abrir este endereço noutro separador: ${t} — se abrir lá mas não aqui, o site está a bloquear imagens embutidas.`, `Card images did not load. Try opening this address in another tab: ${t} — if it opens there but not here, the site is blocking embedded images.`)); }}
+  if (IMG.fails >= 6 && IMG.oks === 0 && !IMG.warned) { IMG.warned = true; const t = IMG.urls('01090')[0]; UI.toast(LX(`As imagens das cartas não carregaram. Testa abrir este endereço noutro separador: ${t} — se abrir lá mas não aqui, o site está a bloquear imagens embutidas.`, `Card images did not load. Try opening this address in another tab: ${t} — if it opens there but not here, the site is blocking embedded images.`)); }
 }
 
 // ---------- desenho das cartas ----------
