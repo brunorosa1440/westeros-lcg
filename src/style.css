@@ -269,3 +269,10 @@ tr:hover td{background:#ffffff06}
   #board .slot,#hand .card{zoom:.55}
   #board .row{min-height:78px}
 }
+
+/* toque: sem menu "guardar imagem", sem seleção de texto, sem zoom de duplo toque */
+.card,.card *,.attc,.slot,#hand,#board,.cgrid,.pgrid,#prompt{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.card img,.pvimg{-webkit-user-drag:none;user-drag:none}
+.card img{pointer-events:none}
+html{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pbtns button.on{border-color:#46d06a;color:#7dff9a;background:#173b22}

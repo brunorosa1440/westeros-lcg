@@ -11,7 +11,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v1.3';
+const APP_VERSION = 'v1.4';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -26,7 +26,7 @@ const IMG = {
   tag(code, cls) {
     if (!this.on || this.broken.has(code)) return '';
     const g = this.good.get(code);
-    return `<img class="${cls || 'cimg'}${g != null ? ' ok' : ''}" src="${this.urls(code)[g || 0]}" data-img="${code}" data-try="${g || 0}" alt="" referrerpolicy="no-referrer" onload="imgOk(this)" onerror="imgFail(this)">`;
+    return `<img class="${cls || 'cimg'}${g != null ? ' ok' : ''}" src="${this.urls(code)[g || 0]}" data-img="${code}" data-try="${g || 0}" alt="" draggable="false" referrerpolicy="no-referrer" onload="imgOk(this)" onerror="imgFail(this)">`;
   },
 };
 function imgOk(el) { IMG.oks++; IMG.good.set(el.dataset.img, +el.dataset.try); el.classList.add('ok'); el.parentElement && el.parentElement.classList.add('hasimg'); }
@@ -128,7 +128,7 @@ class HumanCtrl {
 }
 
 const UI = {
-  ppOpen: new Set(), longPressed: false,
+  ppOpen: new Set(), longPressed: false, inspect: false,
   game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play', pauseInfo: store.get('agot_pause', true), logOpen: store.get('agot_log', true),
   decks: [], cur: null, curIdx: -1,
   filt: { type: 'character', fac: 'mine', q: '', auto: false, pack: 'all' },
@@ -152,7 +152,7 @@ const UI = {
     // toque longo = ver carta (telemóvel)
     let lpT = null, lpX = 0, lpY = 0;
     document.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const el = e.target.closest('[data-uid],[data-code]'); if (!el) return; lpX = e.clientX; lpY = e.clientY;
-      lpT = setTimeout(() => { lpT = null; this.longPressed = true; setTimeout(() => this.longPressed = false, 700); if (el.dataset.uid) { const c = this.cardMap.get(+el.dataset.uid); if (c) this.sheet(c.d, c); } else if (DB[el.dataset.code]) this.sheet(DB[el.dataset.code], null); }, 450); });
+      lpT = setTimeout(() => { lpT = null; this.longPressed = true; try { navigator.vibrate && navigator.vibrate(15); } catch (x) { } setTimeout(() => this.longPressed = false, 700); if (el.dataset.uid) { const c = this.cardMap.get(+el.dataset.uid); if (c) this.sheet(c.d, c); } else if (DB[el.dataset.code]) this.sheet(DB[el.dataset.code], null); }, 450); });
     const lpCancel = e => { if (lpT && (!e || e.type !== 'pointermove' || Math.hypot(e.clientX - lpX, e.clientY - lpY) > 10)) { clearTimeout(lpT); lpT = null; } };
     ['pointerup', 'pointercancel', 'pointermove'].forEach(t => document.addEventListener(t, lpCancel));
     document.addEventListener('contextmenu', e => { if (isMobile() && e.target.closest('[data-uid],[data-code]')) e.preventDefault(); });
@@ -290,7 +290,7 @@ const UI = {
       <div class="piles"><button data-pile="deck" data-p="${p.i}">${LX('Baralho', 'Deck')} ${p.deck.length}</button><button data-pile="discard" data-p="${p.i}">${LX('Descarte', 'Discard')} ${p.discard.length}</button><button data-pile="dead" data-p="${p.i}">${LX('Mortos', 'Dead')} ${p.dead.length}</button><button data-pile="used" data-p="${p.i}">Plots ${p.plots.length} (${LX('usados', 'used')} ${p.used.length})</button></div>
       <div class="mini-plot">${plot}</div><div class="ppmore">${this.ppOpen.has(p.i) ? '▴' : '▾'} ${LX('pilhas e plot', 'piles & plot')}</div></div>`;
     };
-    $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span><span class="mobonly pbtns"><button id="mLog">📜 Log</button><button id="mQuit" class="warn">✕</button></span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
+    $('#gside').innerHTML = pp(op, false) + `<div class="phasebox"><b>${g.phase === 'end' ? LX('FIM', 'END') : (PHASE_NAMES[g.phase] || '').toUpperCase()}</b><span class="note">${LX('Ronda', 'Round')} ${g.round || '—'}</span><span class="mobonly pbtns"><button id="mInspect" class="${this.inspect ? 'on' : ''}">🔍</button><button id="mLog">📜 Log</button><button id="mQuit" class="warn">✕</button></span></div>` + pp(me, true) + `<button id="btnQuit" class="warn">${LX('Abandonar partida', 'Quit game')}</button>`;
     let chb = '';
     if (ch) chb = `<div class="chb">⚔ ${CH_NAMES[ch.type]} · <span class="a">${esc(ch.att.name)} ${g.sideStr(ch, 'att')}</span> × <span class="d">${esc(ch.def.name)} ${g.sideStr(ch, 'def')}</span> · claim ${g.claimValue(ch)}</div>`;
     $('#board').innerHTML = `
@@ -341,6 +341,7 @@ const UI = {
     $('#gside').onclick = e => {
       const b = e.target.closest('[data-pile]'); if (b) return this.showPile(g.players[+b.dataset.p], b.dataset.pile);
       if (isMobile() && e.target.closest('.ppmore')) { const i = +e.target.closest('[data-pp]').dataset.pp; if (this.ppOpen.has(i)) this.ppOpen.delete(i); else this.ppOpen.add(i); return this.render(); }
+      if (e.target.id === 'mInspect') { this.inspect = !this.inspect; if (this.inspect) this.toast(LX('Toca numa carta para ver os detalhes.', 'Tap a card to see its details.')); return this.render(); }
       if (e.target.id === 'mLog') { $('#game').classList.toggle('showlog'); const lg = $('#log'); lg.scrollTop = lg.scrollHeight; return; }
       if (e.target.id === 'btnQuit' || e.target.id === 'mQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
       this.onCardClick(e, actMap);
@@ -350,6 +351,7 @@ const UI = {
     const el = e.target.closest('[data-uid]'); if (!el) return;
     if (this.longPressed) { this.longPressed = false; return; }
     const uid = +el.dataset.uid; const c = this.cardMap.get(uid); const P = this.pending;
+    if (c && this.inspect) { this.inspect = false; this.render(); return this.sheet(c.d, c); }
     if (c && isMobile()) { const interactive = P && ((P.kind === 'select' && P.cands.includes(c)) || (P.kind === 'action' && actMap.get(uid))); if (!interactive) return this.sheet(c.d, c); }
     if (!P || !c) return;
     if (P.kind === 'select') this.toggleSel(P, c);
