@@ -10,7 +10,7 @@ async def main():
         errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto('file://' + os.path.abspath('index.html')); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{OUT}/m_lobby.png')
-        await pg.select_option('#lbSpd', '80'); await pg.tap('#lbGo'); await pg.wait_for_timeout(400)
+        await pg.screenshot(path=f'{OUT}/m_home.png'); await pg.tap('#hmPlay'); await pg.wait_for_timeout(300); await pg.screenshot(path=f'{OUT}/m_setup.png', full_page=True); await pg.select_option('#lbSpd', '80'); await pg.tap('#lbGo'); await pg.wait_for_timeout(400)
         # mulligan / setup com toques reais
         shots = 0
         for step in range(300):
@@ -42,7 +42,7 @@ async def main():
         await pg.evaluate("() => document.getElementById('sheet').classList.remove('open')")
         await pg.evaluate("() => document.querySelectorAll('.modal').forEach(m=>m.remove())"); await pg.tap('#mLog'); await pg.wait_for_timeout(200); await pg.screenshot(path=f'{OUT}/m_log.png'); await pg.mouse.click(20, 400)
         await pg.tap('#menuBtn'); await pg.wait_for_timeout(150); await pg.screenshot(path=f'{OUT}/m_menu.png'); await pg.tap('#menuBtn')
-        await pg.tap('header nav button[data-t=decks]'); await pg.wait_for_timeout(300); await pg.screenshot(path=f'{OUT}/m_decks.png')
+        await pg.evaluate("UI.tab('decks')"); await pg.wait_for_timeout(300); await pg.screenshot(path=f'{OUT}/m_decks.png')
         print('erros:', errs[:5])
         await b.close()
 asyncio.run(main())

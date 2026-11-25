@@ -276,3 +276,55 @@ tr:hover td{background:#ffffff06}
 .card img{pointer-events:none}
 html{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .pbtns button.on{border-color:#46d06a;color:#7dff9a;background:#173b22}
+
+/* ---------- menu inicial ---------- */
+header h1{cursor:pointer}
+body.onhome header nav{visibility:hidden}
+#lobby{position:relative;flex-direction:column}
+.home{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 30%,#2a2214 0%,#0d0e12 65%)}
+.homeIn{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;max-width:380px;text-align:center}
+.homeLogo{width:110px;height:110px;border-radius:24px;box-shadow:0 0 0 2px #6b5527,0 10px 40px #000;margin-bottom:10px}
+.homeTitle{font-family:'Cinzel',serif;font-size:42px;letter-spacing:4px;margin:0;color:var(--gold2);text-shadow:0 2px 18px rgba(217,166,66,.35);font-weight:700}
+.homeSub{font-family:'Cinzel',serif;color:var(--dim);letter-spacing:2px;font-size:13px;margin-bottom:26px}
+.homeBtns{display:flex;flex-direction:column;gap:12px;width:100%}
+.homeBtn{font-family:'Cinzel',serif;font-size:19px;font-weight:600;letter-spacing:1px;padding:16px;border-radius:14px;background:linear-gradient(#1d2029,#14161c);border:1px solid #4a3d22}
+.homeBtn.pri{background:linear-gradient(#f0c96a,#c99532);color:#1a1307;border-color:#f3d27a;box-shadow:0 6px 24px rgba(217,166,66,.25)}
+.homeVer{margin-top:22px}
+/* ---------- preparar batalha ---------- */
+.setup{flex:1;overflow:auto;padding:16px 16px 100px;background:radial-gradient(ellipse at 50% 0%,#221c12 0%,#0d0e12 60%)}
+.setupIn{max-width:980px;margin:0 auto}
+.setupTop{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.setupTop h2{font-family:'Cinzel',serif;color:var(--gold2);margin:0;font-size:22px}
+.vsGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+.vs{font-family:'Cinzel',serif;font-size:44px;font-weight:700;color:var(--gold);text-shadow:0 0 20px rgba(217,166,66,.4);text-align:center}
+.whoLbl{text-align:center;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#aeb4c2;margin:6px 0 10px;font-size:14px}
+.dcard{display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 16px;border-radius:22px;border:1px solid #3a3426;background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--fc) 30%,#2a2416) 0%,#12141a 70%)}
+.dcCrest{width:150px;height:175px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.6))}
+.crest{width:100%;height:100%;display:block}
+.dcName{font-family:'Cinzel',serif;font-size:24px;font-weight:700;color:#f3ead6;margin-top:10px;font-variant:small-caps;letter-spacing:1px}
+.dcMeta{color:#b9b3a6;font-size:15px;margin-top:4px}
+.dcAg{font-family:'Cinzel',serif;color:#e6dcc4;margin-top:6px;font-size:14px}
+.dcThumbs{display:flex;gap:8px;justify-content:center;margin:14px 0 4px;flex-wrap:wrap}
+.dcT{width:54px;height:54px;border-radius:10px;overflow:hidden;border:1px solid #4a4434;background:#22252e;position:relative;display:flex;align-items:center;justify-content:center}
+.dcT span{font-size:9px;color:var(--dim);padding:2px;line-height:1.1}
+.dcT img{position:absolute;width:160%;left:-30%;top:-8%;opacity:0}
+.dcT img.ok{opacity:1}
+.dcErr{color:#ff9c90;font-size:12px;margin-top:6px}
+.dcChange{margin-top:12px;padding:9px 26px;border-radius:12px;font-size:15px;font-weight:600}
+.spdRow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px}
+.spdRow label{color:var(--dim)}
+.setupBar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#0d0e12 35%)}
+.setupBar button{padding:14px 20px;border-radius:14px;font-size:16px;font-weight:600}
+.setupBar .pri{font-family:'Cinzel',serif;font-size:19px;font-weight:700;padding:14px 30px;background:linear-gradient(#f0c96a,#c99532);color:#1a1307;border-color:#f3d27a;box-shadow:0 6px 24px rgba(217,166,66,.3)}
+.pickList{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto;min-width:min(440px,80vw)}
+.pickRow{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(90deg,color-mix(in srgb,var(--fc) 22%,#17191f),#17191f 60%);cursor:pointer}
+.pickRow.on{border-color:var(--gold)}
+.pickCrest{width:40px;height:47px;flex:none}
+@media (max-width:820px){
+  .vsGrid{grid-template-columns:1fr;gap:6px}
+  .vs{font-size:36px;margin:4px 0}
+  .homeTitle{font-size:34px}
+  .dcCrest{width:120px;height:140px}
+  .setupBar .pri{font-size:16px;padding:14px 18px}
+}
+body.onhome header h1{visibility:hidden}

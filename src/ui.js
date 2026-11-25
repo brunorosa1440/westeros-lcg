@@ -11,7 +11,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v1.6';
+const APP_VERSION = 'v1.7';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -127,14 +127,27 @@ class HumanCtrl {
   }
 }
 
+// Brasões originais (escudo pintado com a cor da facção + emblema)
+const CREST_EMB = { stark: '🐺', lannister: '🦁', baratheon: '🦌', greyjoy: '🐙', martell: '☀️', tyrell: '🌹', targaryen: '🐉', thenightswatch: '⚔️', neutral: '⚜️' };
+const CREST_COL = { stark: ['#8d939c', '#3a3f47'], lannister: ['#c0322a', '#4e0c09'], baratheon: ['#e3bf34', '#6b520a'], greyjoy: ['#2f6f93', '#0c2433'], martell: ['#e99236', '#6d3305'], tyrell: ['#3f8a38', '#11300e'], targaryen: ['#8a1c1c', '#200404'], thenightswatch: ['#4a4a4a', '#0e0e0e'], neutral: ['#9b8a66', '#3b3222'] };
+let crestN = 0;
+function crestSVG(f) {
+  const id = 'cg' + (++crestN), [a, b] = CREST_COL[f] || CREST_COL.neutral;
+  const shield = 'M12 10 H108 V64 C108 102 82 122 60 132 C38 122 12 102 12 64 Z';
+  return `<svg viewBox="0 0 120 140" class="crest" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient><radialGradient id="${id}h" cx="0.35" cy="0.2" r="0.7"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <path d="${shield}" fill="url(#${id})" stroke="#e0b553" stroke-width="5"/><path d="${shield}" fill="url(#${id}h)"/>
+    <path d="M20 17 H100 V64 C100 96 78 114 60 123 C42 114 20 96 20 64 Z" fill="none" stroke="#f3d27a" stroke-opacity=".45" stroke-width="1.5"/>
+    <text x="60" y="80" font-size="50" text-anchor="middle" dominant-baseline="middle" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))">${CREST_EMB[f] || CREST_EMB.neutral}</text></svg>`;
+}
 const UI = {
   ppOpen: new Set(), longPressed: false, inspect: false,
   game: null, me: null, pending: null, cardMap: new Map(), rq: false, curTab: 'play', pauseInfo: store.get('agot_pause', true), logOpen: store.get('agot_log', true),
-  decks: [], cur: null, curIdx: -1,
+  decks: [], cur: null, curIdx: -1, lobbyView: 'home', selMe: (store.get('agot_sel', [0, 1]))[0], selAi: (store.get('agot_sel', [0, 1]))[1],
   filt: { type: 'character', fac: 'mine', q: '', auto: false, pack: 'all' },
   init() {
     this.decks = store.get('agot_decks', []);
     document.querySelectorAll('header nav button').forEach(b => b.onclick = () => this.tab(b.dataset.t));
+    $('header h1').onclick = () => this.tab('home');
     document.addEventListener('mouseover', e => {
       const u = e.target.closest('[data-uid]'); if (u) { const c = this.cardMap.get(+u.dataset.uid); if (c) showPreview(c.d, c); return; }
       const k = e.target.closest('[data-code]'); if (k && DB[k.dataset.code]) showPreview(DB[k.dataset.code], null);
@@ -162,7 +175,7 @@ const UI = {
     this.applyLog();
     this.selectDeck(0, true);
     this.refreshAll();
-    this.tab('play');
+    this.tab('home');
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }); } catch (e) { }
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => { });
     $('#offBtn').onclick = () => this.offlineModal();
@@ -178,7 +191,7 @@ const UI = {
     $('#offBtn').textContent = LX('⬇ Offline', '⬇ Offline');
     this.applyLog();
     $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
-    const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
+    const nav = { home: LX('⌂ Menu', '⌂ Menu'), play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
     document.querySelectorAll('header nav button').forEach(b => b.textContent = nav[b.dataset.t]);
     $('#tagline').textContent = LX('Protótipo · contra IA', 'Prototype · vs AI') + ' · ' + APP_VERSION;
     document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = `<span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span>`);
@@ -259,34 +272,80 @@ const UI = {
     this.curTab = t;
     document.querySelectorAll('header nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
-    if (t === 'play') { (this.game ? $('#game') : $('#lobby')).classList.add('on'); if (!this.game) this.renderLobby(); }
+    document.body.classList.toggle('onhome', t === 'home' || (t === 'play' && !this.game));
+    if (t === 'home') { this.lobbyView = 'home'; $('#lobby').classList.add('on'); this.renderLobby(); }
+    else if (t === 'play') { if (this.game) $('#game').classList.add('on'); else { this.lobbyView = 'setup'; $('#lobby').classList.add('on'); this.renderLobby(); } }
     else $('#' + t).classList.add('on');
     if (t === 'decks') this.renderDeckList();
   },
   allDecks() { return [...STARTER_DECKS, ...this.decks]; },
   // ---------- lobby ----------
   renderLobby() {
-    const prevMe = $('#lbMe') ? $('#lbMe').value : null, prevAi = $('#lbAi') ? $('#lbAi').value : null;
-    const opts = this.allDecks().map((d, i) => { const v = validateDeck(d).length === 0; return `<option value="${i}">${esc(d.name)}${v ? '' : LX(' (inválido)', ' (invalid)')}</option>`; }).join('');
-    $('#lobby').innerHTML = `<div class="wrap"><div class="lobby">
-      <div class="panel"><h2>${LX('Nova partida contra a IA', 'New game against the AI')}</h2>
-      <label>${LX('O teu deck', 'Your deck')}</label><select id="lbMe">${opts}</select>
-      <label>${LX('Deck da IA', "AI's deck")}</label><select id="lbAi">${opts}</select>
-      <label>${LX('Velocidade da IA', 'AI speed')}</label><select id="lbSpd"><option value="700">${LX('Lenta', 'Slow')}</option><option value="350" selected>Normal</option><option value="80">${LX('Rápida', 'Fast')}</option></select>
-      <div style="margin-top:14px;display:flex;gap:8px"><button class="pri" id="lbGo">${LX('Começar partida', 'Start game')}</button></div>
-      <p class="note" id="lbMsg"></p></div>
-      <div class="panel"><h2>${LX('Como jogar', 'How to play')}</h2><div class="note">${LX(
-      'A barra dourada por cima da tua mão diz sempre o que tens de fazer. Cartas com contorno <b style="color:#46d06a">verde</b> podem ser escolhidas ou ativadas — clica nelas. Passa o rato por cima de qualquer carta para ver os detalhes à direita.<br>Tudo é automático: rendimento, iniciativa, claim, keywords (renown, insight, intimidate, pillage, stealth), dominance, reserve e as habilidades das cartas automatizadas. Cartas marcadas com ⚠ ainda não têm a habilidade programada.',
-      'The gold bar above your hand always tells you what to do. Cards outlined in <b style="color:#46d06a">green</b> can be chosen or used — click them. Hover over any card to see its details on the right.<br>Everything is automated: income, initiative, claim, keywords (renown, insight, intimidate, pillage, stealth), dominance, reserve and the abilities of automated cards. Cards marked ⚠ do not have their ability programmed yet.')}</div></div>
-    </div></div>`;
-    $('#lbMe').value = prevMe ?? '0'; $('#lbAi').value = prevAi ?? String(Math.min(1, this.allDecks().length - 1));
-    if (!$('#lbMe').value) $('#lbMe').value = '0'; if (!$('#lbAi').value) $('#lbAi').value = '0';
+    if (this.lobbyView === 'setup') return this.renderSetup();
+    $('#lobby').innerHTML = `<div class="home"><div class="homeIn">
+      <img class="homeLogo" src="icons/icon-192.png?v=3" alt="" draggable="false">
+      <h1 class="homeTitle">Westeros LCG</h1>
+      <div class="homeSub">A Game of Thrones · ${LX('2.ª edição', '2nd edition')}</div>
+      <div class="homeBtns">
+        ${this.game ? `<button class="homeBtn pri" id="hmCont">▶ ${LX('Continuar partida', 'Continue game')}</button>` : ''}
+        <button class="homeBtn ${this.game ? '' : 'pri'}" id="hmPlay">⚔ ${LX('Jogar', 'Play')}</button>
+        <button class="homeBtn" id="hmDecks">🛡 ${LX('Construtor de decks', 'Deck Builder')}</button>
+        <button class="homeBtn" id="hmHelp">📜 ${LX('Cartas e Regras', 'Cards & Rules')}</button>
+      </div>
+      <div class="note homeVer">${LX('Contra a IA', 'Against the AI')} · ${APP_VERSION}</div></div></div>`;
+    if ($('#hmCont')) $('#hmCont').onclick = () => this.tab('play');
+    $('#hmPlay').onclick = () => { if (this.game) return this.modal(`<p>${LX('Há uma partida em curso. Abandoná-la e começar outra?', 'A game is in progress. Quit it and start another?')}</p>`, [{ label: LX('Nova partida', 'New game'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }]); this.tab('play'); };
+    $('#hmDecks').onclick = () => this.tab('decks');
+    $('#hmHelp').onclick = () => this.tab('help');
+  },
+  keyCards(d, n) {
+    const ch = Object.keys(d.cards).filter(c => DB[c] && DB[c].t === 'character');
+    ch.sort((a, b) => (DB[b].u ? 1 : 0) - (DB[a].u ? 1 : 0) || (DB[b].cost || 0) - (DB[a].cost || 0));
+    return ch.slice(0, n);
+  },
+  deckCardHTML(d, who) {
+    const total = Object.values(d.cards).reduce((a, b) => a + b, 0), errs = validateDeck(d);
+    return `<div class="dcard" style="--fc:var(--f-${d.faction})">
+      <div class="dcCrest">${crestSVG(d.faction)}</div>
+      <div class="dcName">${esc(d.name)}</div>
+      <div class="dcMeta">${FACTION_NAMES[d.faction]} · ${total} ${LX('cartas', 'cards')}</div>
+      ${d.agenda && DB[d.agenda] ? `<div class="dcAg" data-code="${d.agenda}">📜 ${esc(DB[d.agenda].n)}</div>` : `<div class="dcAg note">${LX('Sem agenda', 'No agenda')}</div>`}
+      <div class="dcThumbs">${this.keyCards(d, 5).map(c => `<div class="dcT" data-code="${c}" title="${esc(DB[c].n)}"><span>${esc(DB[c].n.split(/[ ,]/)[0])}</span>${IMG.tag(c, 'cimg')}</div>`).join('')}</div>
+      ${errs.length ? `<div class="dcErr">⚠ ${esc(errs[0])}</div>` : ''}
+      <button class="dcChange" data-who="${who}">${LX('Mudar', 'Change')}</button></div>`;
+  },
+  renderSetup() {
+    const all = this.allDecks();
+    if (!(this.selMe < all.length)) this.selMe = 0;
+    if (!(this.selAi < all.length)) this.selAi = Math.min(1, all.length - 1);
+    const spd = store.get('agot_spd', '350');
+    $('#lobby').innerHTML = `<div class="setup"><div class="setupIn">
+      <div class="setupTop"><button id="stBack">← ${LX('Menu', 'Menu')}</button><h2>${LX('Prepara a batalha', 'Prepare for battle')}</h2></div>
+      <div class="vsGrid">
+        <div><div class="whoLbl">👤 ${LX('O teu deck', 'Your deck')}</div>${this.deckCardHTML(all[this.selMe], 'me')}</div>
+        <div class="vs">VS</div>
+        <div><div class="whoLbl">🤖 ${LX('Deck da IA', "AI's deck")}</div>${this.deckCardHTML(all[this.selAi], 'ai')}</div>
+      </div>
+      <div class="spdRow"><label>${LX('Velocidade da IA', 'AI speed')}</label><select id="lbSpd"><option value="700">${LX('Lenta', 'Slow')}</option><option value="350">Normal</option><option value="80">${LX('Rápida', 'Fast')}</option></select></div>
+      <p class="note" id="lbMsg" style="text-align:center"></p>
+      </div></div>
+      <div class="setupBar"><button id="stBuild">🛡 Builder</button><button class="pri" id="lbGo">⚔ ${LX('Começar a batalha', 'Start the battle')}</button></div>`;
+    $('#lbSpd').value = spd; $('#lbSpd').onchange = () => store.set('agot_spd', $('#lbSpd').value);
+    $('#stBack').onclick = () => this.tab('home');
+    $('#stBuild').onclick = () => { this.selectDeck(this.selMe); this.tab('decks'); };
+    $('#lobby').querySelectorAll('.dcChange').forEach(b => b.onclick = () => this.pickDeck(b.dataset.who));
     $('#lbGo').onclick = () => {
-      const a = this.allDecks()[+$('#lbMe').value], b = this.allDecks()[+$('#lbAi').value];
+      const a = all[this.selMe], b = all[this.selAi];
       const ea = validateDeck(a), eb = validateDeck(b);
       if (ea.length || eb.length) { $('#lbMsg').innerHTML = `<span style="color:#ff9c90">${LX('Deck inválido', 'Invalid deck')}: ${esc([...ea, ...eb][0])}</span>`; return; }
       this.startGame(a, b, +$('#lbSpd').value);
     };
+  },
+  pickDeck(who) {
+    const all = this.allDecks(), cur = who === 'me' ? this.selMe : this.selAi;
+    const m = this.modal(`<div class="pickList">${all.map((d, i) => { const bad = validateDeck(d).length; return `<div class="pickRow ${i === cur ? 'on' : ''}" data-pick="${i}" style="--fc:var(--f-${d.faction})"><div class="pickCrest">${crestSVG(d.faction)}</div><div><b>${esc(d.name)}</b><div class="note">${FACTION_NAMES[d.faction]}${d.agenda && DB[d.agenda] ? ' · ' + esc(DB[d.agenda].n) : ''}${d.starter ? ' · ' + LX('inicial', 'starter') : ''}${bad ? ' · <span style="color:#ff9c90">' + LX('inválido', 'invalid') + '</span>' : ''}</div></div></div>`; }).join('')}</div>`,
+      [{ label: LX('Cancelar', 'Cancel') }], who === 'me' ? LX('Escolhe o teu deck', 'Choose your deck') : LX('Escolhe o deck da IA', "Choose the AI's deck"));
+    m.querySelectorAll('[data-pick]').forEach(r => r.onclick = () => { const i = +r.dataset.pick; if (who === 'me') this.selMe = i; else this.selAi = i; store.set('agot_sel', [this.selMe, this.selAi]); m.remove(); this.renderSetup(); });
   },
   startGame(da, db, delay) {
     this.pending = null;
@@ -380,7 +439,7 @@ const UI = {
       if (isMobile() && e.target.closest('.ppmore')) { const i = +e.target.closest('[data-pp]').dataset.pp; if (this.ppOpen.has(i)) this.ppOpen.delete(i); else this.ppOpen.add(i); return this.render(); }
       if (e.target.id === 'mInspect') { this.inspect = !this.inspect; if (this.inspect) this.toast(LX('Toca numa carta para ver os detalhes.', 'Tap a card to see its details.')); return this.render(); }
       if (e.target.id === 'mLog') { $('#game').classList.toggle('showlog'); const lg = $('#log'); lg.scrollTop = lg.scrollHeight; return; }
-      if (e.target.id === 'btnQuit' || e.target.id === 'mQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('play'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
+      if (e.target.id === 'btnQuit' || e.target.id === 'mQuit') return this.modal(`<p>${LX('Abandonar a partida em curso?', 'Quit the current game?')}</p>`, [{ label: LX('Abandonar', 'Quit'), pri: true, fn: () => { this.game = null; this.pending = null; this.tab('home'); } }, { label: LX('Cancelar', 'Cancel') }], LX('Abandonar', 'Quit'));
       this.onCardClick(e, actMap);
     };
   },
@@ -502,7 +561,7 @@ const UI = {
     }
     $('#dDup').onclick = () => this.dupDeck();
     $('#dExp').onclick = () => { const t = exportDeckText(dk); this.modal(`<textarea style="width:min(560px,80vw);height:340px">${esc(t)}</textarea><p class="note">${LX('Este texto pode ser importado de volta aqui ou no ThronesDB.', 'This text can be imported back here or into ThronesDB.')}</p>`, [{ label: LX('Copiar', 'Copy'), pri: true, fn: () => { try { navigator.clipboard.writeText(t); } catch (e) { } } }, { label: 'OK' }], LX('Exportar deck', 'Export deck')); };
-    $('#dPlay').onclick = () => { const i = this.curIdx; this.tab('play'); if (!this.game && $('#lbMe')) $('#lbMe').value = String(i); };
+    $('#dPlay').onclick = () => { this.selMe = this.curIdx; store.set('agot_sel', [this.selMe, this.selAi]); this.tab('play'); };
   },
   // ---------- importação ----------
   thronesdbApiUrls(input) {
