@@ -182,7 +182,7 @@ tr:hover td{background:#ffffff06}
 .toast.good{border-color:#46d06a}.toast.bad{border-color:#e0574a}
 .kwlist{max-width:640px;columns:1}
 .kwlist b{color:var(--gold2)}.kwlist p{margin:2px 0 10px;line-height:1.45}
-#pauseBtn,#kwBtn{padding:4px 10px;font-size:12px}
+#pauseBtn,#kwBtn,#offBtn{padding:4px 10px;font-size:12px}
 
 /* ---------- telemóvel ---------- */
 #menuBtn,#logFab,.ppmore,.mobonly{display:none}

@@ -11,7 +11,7 @@ const store = {
 
 // ---------- imagens das cartas (ThronesDB, com reserva no CDN da FFG) ----------
 const PACK_CGDB = { '01': 1 };
-const APP_VERSION = 'v1.4';
+const APP_VERSION = 'v1.5';
 const IMG = {
   on: store.get('agot_img', true), fails: 0, oks: 0, broken: new Set(), good: new Map(),
   urls(code) {
@@ -163,6 +163,8 @@ const UI = {
     this.selectDeck(0, true);
     this.refreshAll();
     this.tab('play');
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => { });
+    $('#offBtn').onclick = () => this.offlineModal();
   },
   setLang(l) { LANG = l; try { localStorage.setItem('agot_lang', l); } catch (e) { } this.refreshAll(); },
   refreshAll() {
@@ -172,6 +174,7 @@ const UI = {
     $('#pauseBtn').textContent = this.pauseInfo ? LX('⏸ Resumos: ligados', '⏸ Summaries: on') : LX('⏸ Resumos: desligados', '⏸ Summaries: off');
     $('#pauseBtn').title = LX('Parar depois de cada desafio/fase para mostrar o que aconteceu', 'Pause after each challenge/phase to show what happened');
     $('#kwBtn').textContent = 'Keywords';
+    $('#offBtn').textContent = LX('⬇ Offline', '⬇ Offline');
     this.applyLog();
     $('#imgBtn').textContent = IMG.on ? LX('🖼 Imagens: ligadas', '🖼 Images: on') : LX('🖼 Imagens: desligadas', '🖼 Images: off');
     const nav = { play: LX('Jogar', 'Play'), decks: 'Decks', help: LX('Cartas & Regras', 'Cards & Rules') };
@@ -180,6 +183,36 @@ const UI = {
     document.querySelectorAll('.pvbox').forEach(e => e.innerHTML = `<span class="note">${LX('Passa o rato por cima de uma carta para ver os detalhes.', 'Hover over a card to see its details.')}</span>`);
     this.renderLobby(); this.renderDeckList(); if (this.cur) { this.renderPool(); this.renderDeckSide(); } this.renderHelp();
     if (this.game) this.render();
+  },
+  async imgCacheCount() { try { const c = await caches.open('wlcg-img-v1'); return (await c.keys()).length; } catch (e) { return null; } },
+  async offlineModal() {
+    const n = await this.imgCacheCount();
+    const sw = 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost');
+    const m = this.modal(`<div style="max-width:560px"><p>${LX('O jogo guarda automaticamente no teu dispositivo cada imagem de carta que aparece, e o próprio jogo também fica guardado. Depois disso funciona sem internet.', 'The game automatically stores every card image it shows on your device, and the game itself is stored too. After that it works without internet.')}</p>
+      <p><b>${LX('Imagens guardadas', 'Stored images')}:</b> <span id="offCount">${n == null ? '—' : n}</span></p>
+      ${sw ? '' : `<p style="color:#f0a35a">${LX('Isto só funciona no site (https), não aqui.', 'This only works on the website (https), not here.')}</p>`}
+      <p class="note">${LX('Para jogar offline com tudo pronto, guarda já as imagens de todas as cartas dos teus decks (iniciais e guardados). Demora um pouco na primeira vez.', 'To play offline with everything ready, store the images of every card in your decks (starter and saved) now. It takes a while the first time.')}</p>
+      <div id="offProg" class="note"></div></div>`,
+      [{ label: LX('Guardar imagens dos meus decks', 'Store images of my decks'), pri: true, fn: false }, { label: LX('Apagar imagens guardadas', 'Delete stored images'), fn: false }, { label: 'OK' }], LX('Jogar offline', 'Play offline'));
+    m.querySelector('[data-mb="0"]').onclick = () => this.prefetchImages(m);
+    m.querySelector('[data-mb="1"]').onclick = async () => { try { await caches.delete('wlcg-img-v1'); } catch (e) { } m.querySelector('#offCount').textContent = '0'; };
+  },
+  async prefetchImages(m) {
+    const prog = m.querySelector('#offProg'); if (!('caches' in window)) { prog.textContent = LX('Este browser não permite guardar imagens.', 'This browser cannot store images.'); return; }
+    const codes = new Set(); for (const d of this.allDecks()) for (const c of Object.keys(d.cards)) codes.add(c); for (const d of this.allDecks()) if (d.agenda) codes.add(d.agenda);
+    const list = [...codes]; const cache = await caches.open('wlcg-img-v1'); let done = 0, ok = 0, fail = 0;
+    const one = async code => {
+      for (const url of IMG.urls(code)) {
+        if (await cache.match(url, { ignoreVary: true })) { ok++; return; }
+        try { let r; try { r = await fetch(url, { mode: 'cors', credentials: 'omit' }); if (!r.ok) throw 0; } catch (e) { r = await fetch(url, { mode: 'no-cors', credentials: 'omit' }); }
+          if (r.ok || r.type === 'opaque') { await cache.put(url, r); ok++; return; } } catch (e) { }
+      }
+      fail++;
+    };
+    const queue = [...list]; const workers = Array.from({ length: 6 }, async () => { while (queue.length) { await one(queue.shift()); done++; prog.textContent = `${done} / ${list.length}`; } });
+    await Promise.all(workers);
+    prog.textContent = LX(`Concluído: ${ok} imagens guardadas${fail ? `, ${fail} falharam` : ''}.`, `Done: ${ok} images stored${fail ? `, ${fail} failed` : ''}.`);
+    const n = await this.imgCacheCount(); if (n != null) m.querySelector('#offCount').textContent = n;
   },
   sheet(d, inst) { const s = $('#sheet'); s.innerHTML = `<div class="sheetbox"><button class="sheetclose">✕</button>${previewHTML(d, inst)}</div>`; s.classList.add('open'); },
   toast(msg, tone) { let box = $('#toasts'); if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); } const t = document.createElement('div'); t.className = 'toast ' + (tone || ''); t.textContent = msg; box.appendChild(t); setTimeout(() => t.remove(), 9000); t.onclick = () => t.remove(); },
