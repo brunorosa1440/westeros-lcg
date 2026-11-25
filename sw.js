@@ -1,5 +1,5 @@
 // Service worker: jogo offline + cache das imagens das cartas
-const APP = 'wlcg-app-v15';
+const APP = 'wlcg-app-v16';
 const IMG = 'wlcg-img-v1';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-32.png?v=3', './icons/icon-180.png?v=3', './icons/icon-192.png?v=3', './icons/icon-512.png?v=3'];
 const IMG_HOSTS = ['thronesdb.com', 'theironthrone.net', 'lcg-cdn.fantasyflightgames.com'];
